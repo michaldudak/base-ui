@@ -26,11 +26,6 @@
       "matchPackagePatterns": "@emotion/*"
     },
     {
-      "groupName": "core-js",
-      "matchPackageNames": ["core-js"],
-      "allowedVersions": "< 2.0.0"
-    },
-    {
       "groupName": "JSS",
       "matchPackageNames": [
         "css-jss",
@@ -55,8 +50,13 @@
       ]
     },
     {
+      "groupName": "MUI internal",
+      "matchPackagePatterns": ["@mui/internal-*"],
+      "schedule": "before 6:00am on Wednesday"
+    },
+    {
       "groupName": "MUI",
-      "matchPackagePatterns": ["@mui/*"],
+      "matchDepPatterns": ["@mui/*"],
       "allowedVersions": "!/-dev/",
       "schedule": "before 6:00am on Wednesday"
     },
