@@ -104,11 +104,6 @@ describe('<Select.Root />', () => {
 
   describe('prop: onValueChange', () => {
     it('should call onValueChange when an option is selected', async function test() {
-      // Skipped in browser due to unsolved flakiness
-      if (!/jsdom/.test(window.navigator.userAgent)) {
-        this.skip();
-      }
-
       const handleValueChange = spy();
 
       function App() {

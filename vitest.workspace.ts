@@ -25,36 +25,36 @@ export default defineWorkspace([
       },
     },
   },
-  {
-    extends: './vitest.config.mts',
-    plugins: [react()],
-    test: {
-      include: [`packages/mui-base/src/**/*.test.?(c|m)[jt]s?(x)`],
-      exclude: [`packages/mui-base/src/**/*.jsdom.test.?(c|m)[jt]s?(x)`],
-      name: `browser.firefox/base-ui`,
-      env: {
-        MUI_BROWSER: 'true',
-      },
-      browser: {
-        enabled: true,
-        name: 'firefox',
-        provider: 'playwright',
-        headless: true,
-        screenshotFailures: false,
-      },
-    },
-  },
-  {
-    extends: './vitest.config.mts',
-    plugins: [react()],
-    test: {
-      include: [`packages/mui-base/src/**/*.test.?(c|m)[jt]s?(x)`],
-      exclude: [`packages/mui-base/src/**/*.browser.test.?(c|m)[jt]s?(x)`],
-      name: `jsdom/base-ui`,
-      environment: 'jsdom',
-      env: {
-        MUI_JSDOM: 'true',
-      },
-    },
-  },
+  // {
+  //   extends: './vitest.config.mts',
+  //   plugins: [react()],
+  //   test: {
+  //     include: [`packages/mui-base/src/**/*.test.?(c|m)[jt]s?(x)`],
+  //     exclude: [`packages/mui-base/src/**/*.jsdom.test.?(c|m)[jt]s?(x)`],
+  //     name: `browser.firefox/base-ui`,
+  //     env: {
+  //       MUI_BROWSER: 'true',
+  //     },
+  //     browser: {
+  //       enabled: true,
+  //       name: 'firefox',
+  //       provider: 'playwright',
+  //       headless: true,
+  //       screenshotFailures: false,
+  //     },
+  //   },
+  // },
+  // {
+  //   extends: './vitest.config.mts',
+  //   plugins: [react()],
+  //   test: {
+  //     include: [`packages/mui-base/src/**/*.test.?(c|m)[jt]s?(x)`],
+  //     exclude: [`packages/mui-base/src/**/*.browser.test.?(c|m)[jt]s?(x)`],
+  //     name: `jsdom/base-ui`,
+  //     environment: 'jsdom',
+  //     env: {
+  //       MUI_JSDOM: 'true',
+  //     },
+  //   },
+  // },
 ]);

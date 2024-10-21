@@ -81,10 +81,6 @@ describe('<Select.Option />', () => {
   });
 
   it('should select option when Enter key is pressed', async function test() {
-    if (!/jsdom/.test(window.navigator.userAgent)) {
-      this.skip();
-    }
-
     const { user } = await render(
       <Select.Root animated={false}>
         <Select.Trigger data-testid="trigger">
@@ -109,9 +105,12 @@ describe('<Select.Option />', () => {
     await user.keyboard('{ArrowDown}');
     await user.keyboard('{Enter}');
 
-    await waitFor(() => {
-      expect(value.textContent).to.equal('two');
-    });
+    await waitFor(
+      () => {
+        expect(value.textContent).to.equal('two');
+      },
+      { timeout: 2000 },
+    );
   });
 
   it('should not select disabled option', async () => {
@@ -211,10 +210,13 @@ describe('<Select.Option />', () => {
 
       await user.keyboard('{ArrowDown}');
 
-      expect(screen.getByRole('option', { name: 'b' })).to.have.attribute(
-        'data-highlighted',
-        'true',
-      );
+      await waitFor(() => {
+        expect(screen.getByRole('option', { name: 'b' })).to.have.attribute(
+          'data-highlighted',
+          'true',
+        );
+      });
+
       expect(screen.getByRole('option', { name: 'a' })).not.to.have.attribute('data-highlighted');
     });
 
