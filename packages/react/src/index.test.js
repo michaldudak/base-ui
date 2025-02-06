@@ -3,7 +3,7 @@
  * Important: This test also serves as a point to
  * import the entire lib for coverage reporting
  */
-import { expect } from 'chai';
+import { expect } from 'vitest';
 import { describe, it } from 'vitest';
 import * as BaseUI from './index';
 

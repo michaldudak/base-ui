@@ -109,11 +109,6 @@
       "matchManagers": ["github-actions"]
     },
     {
-      "groupName": "chai - incompatible versions",
-      "matchPackageNames": ["chai", "@types/chai"],
-      "allowedVersions": "< 5.0.0"
-    },
-    {
       "groupName": "react-docgen - incompatible versions",
       "matchPackageNames": ["react-docgen"],
       "allowedVersions": "< 6.0.0"

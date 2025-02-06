@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { expect } from 'vitest';
 import * as playwright from 'playwright';
 import { describe, it } from 'vitest';
 import type {

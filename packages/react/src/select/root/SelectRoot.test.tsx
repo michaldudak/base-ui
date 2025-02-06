@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Select } from '@base-ui-components/react/select';
 import { fireEvent, flushMicrotasks, screen, waitFor } from '@mui/internal-test-utils';
 import { createRenderer, isJSDOM } from '#test-utils';
-import { expect } from 'chai';
+import { expect } from 'vitest';
 import { spy } from 'sinon';
 
 describe('<Select.Root />', () => {

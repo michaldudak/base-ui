@@ -7,7 +7,7 @@ import { Slider } from '@base-ui-components/react/slider';
 import { RadioGroup } from '@base-ui-components/react/radio-group';
 import { Radio } from '@base-ui-components/react/radio';
 import { createRenderer, screen } from '@mui/internal-test-utils';
-import { expect } from 'chai';
+import { expect } from 'vitest';
 import { describeConformance } from '../../../test/describeConformance';
 
 describe('<Field.Description />', () => {

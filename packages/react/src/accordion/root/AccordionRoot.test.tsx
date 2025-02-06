@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { expect } from 'chai';
+import { expect } from 'vitest';
 import { spy } from 'sinon';
 import { flushMicrotasks } from '@mui/internal-test-utils';
 import { DirectionProvider } from '@base-ui-components/react/direction-provider';

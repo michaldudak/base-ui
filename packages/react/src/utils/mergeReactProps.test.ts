@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { expect } from 'vitest';
 import { spy } from 'sinon';
 import { mergeReactProps } from './mergeReactProps';
 import type { BaseUIEvent } from './types';

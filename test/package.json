@@ -11,12 +11,10 @@
     "@mui/internal-test-utils": "^1.0.26",
     "@playwright/test": "1.50.0",
     "@testing-library/dom": "^10.4.0",
-    "@types/chai": "^4.3.20",
     "@types/chai-dom": "^1.11.3",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.2",
     "@types/sinon": "^17.0.3",
-    "chai": "^4.5.0",
     "docs": "workspace:^",
     "fast-glob": "^3.3.3",
     "fs-extra": "^11.3.0",
@@ -27,8 +25,6 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.5",
     "sinon": "^17.0.1",
-    "util": "^0.12.5",
-    "webpack": "^5.97.1",
     "yargs": "^17.7.2"
   }
 }

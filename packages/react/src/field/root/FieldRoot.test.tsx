@@ -9,7 +9,7 @@ import { Radio } from '@base-ui-components/react/radio';
 import { Select } from '@base-ui-components/react/select';
 import userEvent from '@testing-library/user-event';
 import { act, fireEvent, flushMicrotasks, screen, waitFor } from '@mui/internal-test-utils';
-import { expect } from 'chai';
+import { expect } from 'vitest';
 import { createRenderer, describeConformance } from '#test-utils';
 import { CheckboxGroup } from '@base-ui-components/react/checkbox-group';
 
