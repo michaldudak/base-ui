@@ -34,3 +34,5 @@ To see the latest updates, check out the [releases](https://base-ui.com/react/ov
 ## License
 
 This project is licensed under the terms of the [MIT license](/LICENSE).
+
+---
