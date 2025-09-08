@@ -105,6 +105,7 @@ function SearchBox(props: SearchBoxProps) {
       onValueChange={onChange}
       items={suggestions}
       filter={null}
+      itemToStringValue={(item) => item.searchString}
     >
       <div className="flex gap-2 items-center box-border h-10 w-sm rounded-full border border-(--color-border) p-[1px] text-(--color-text-primary) bg-white focus-within:p-0 focus-within:border-2 focus-within:border-(--color-accent)">
         <SearchIcon className="pl-3 h-4 fill-(--color-icon)" />
