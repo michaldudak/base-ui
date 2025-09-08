@@ -104,7 +104,6 @@ function SearchBox(props: SearchBoxProps) {
       value={value}
       onValueChange={onChange}
       items={suggestions}
-      filter={null}
       itemToStringValue={(item) => item.searchString}
     >
       <div className="flex gap-2 items-center box-border h-10 w-sm rounded-full border border-(--color-border) p-[1px] text-(--color-text-primary) bg-white focus-within:p-0 focus-within:border-2 focus-within:border-(--color-accent)">
@@ -195,7 +194,33 @@ function RecentSearchItem({ suggestion, onRemove }: RecentSearchItemProps) {
 
 function SearchResultItem(props: { suggestion: Suggestion }) {
   const { suggestion } = props;
-  return null;
+  return (
+    <Autocomplete.Item
+      key={suggestion.searchString}
+      className="px-4 py-3 data-highlighted:bg-(--color-highlight-bg) cursor-pointer transition-colors duration-200 hover:transition-none"
+      value={suggestion}
+    >
+      <div className="flex gap-2">
+        <div className="size-10">
+          {suggestion.imageUrl ? (
+            <img
+              src={suggestion.imageUrl}
+              alt={suggestion.title}
+              className="rounded-full size-10"
+            />
+          ) : (
+            <div className="size-10 flex items-center justify-center">
+              <SearchIcon className="h-5 text-(--color-icon)" />
+            </div>
+          )}
+        </div>
+        <div className="flex grow flex-col justify-center leading-5">
+          {suggestion.title && <div className="font-bold">{suggestion.title}</div>}
+          <div className="text-(--color-text-secondary)">{suggestion.searchString}</div>
+        </div>
+      </div>
+    </Autocomplete.Item>
+  );
 }
 
 function RecentSearchesHeader(props: { onRemoveAll?: () => void }) {
