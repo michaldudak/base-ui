@@ -69,10 +69,13 @@ export default function Experiment() {
       <style>
         {`
         :root {
+          --color-text-primary: rgb(15, 20, 25);
+          --color-text-secondary: rgb(83, 100, 113);
           --color-accent: rgb(29, 155, 240);
-          --color-border: rgb(239, 243, 244);
+          --color-border: rgb(207, 217, 222);
           --color-icon: rgb(83, 100, 113);
           --color-highlight-bg: rgb(247, 249, 249);
+          --color-button-highlight-bg: rgba(29, 155, 240, 0.1);
           --shadow-popup: rgba(101, 119, 134, 0.2) 0px 0px 15px, rgba(101, 119, 134, 0.15) 0px 0px 3px 1px;
         }`}
       </style>
@@ -103,11 +106,12 @@ function SearchBox(props: SearchBoxProps) {
       items={suggestions}
       filter={null}
     >
-      <div className="flex gap-2 items-center box-border h-10 w-sm rounded-full border border-(--color-border) p-[1px] focus-within:p-0 focus-within:border-2 focus-within:border-(--color-accent)">
+      <div className="flex gap-2 items-center box-border h-10 w-sm rounded-full border border-(--color-border) p-[1px] text-(--color-text-primary) bg-white focus-within:p-0 focus-within:border-2 focus-within:border-(--color-accent)">
         <SearchIcon className="pl-3 h-4 fill-(--color-icon)" />
         <Autocomplete.Input
           placeholder={placeholder}
-          className="grow text-sm mr-4 aret-(--color-accent) focus-visible:outline-hidden"
+          className="grow text-sm mr-4 caret-(--color-accent) placeholder:text-(--color-text-primary) focus-visible:outline-hidden"
+          onFocus={() => setOpen(true)}
         />
       </div>
 
@@ -150,7 +154,7 @@ function RecentSearchItem({ suggestion, onRemove }: RecentSearchItemProps) {
   return (
     <Autocomplete.Item
       key={suggestion.searchString}
-      className="px-4 py-3 data-highlighted:bg-(--color-highlight-bg) cursor-pointer transition-colors duration-200"
+      className="px-4 py-3 data-highlighted:bg-(--color-highlight-bg) cursor-pointer transition-colors duration-200 hover:transition-none"
       value={suggestion}
     >
       <div className="flex gap-2">
@@ -167,12 +171,21 @@ function RecentSearchItem({ suggestion, onRemove }: RecentSearchItemProps) {
             </div>
           )}
         </div>
-        <div className="flex grow flex-col justify-center">
+        <div className="flex grow flex-col justify-center leading-5">
           {suggestion.title && <div className="font-bold">{suggestion.title}</div>}
-          <div>{suggestion.searchString}</div>
+          <div className="text-(--color-text-secondary)">{suggestion.searchString}</div>
         </div>
         <div className="w-9 flex items-center justify-center">
-          <RemoveIcon className="size-4.5 stroke-none fill-(--color-accent)" />
+          <button
+            type="button"
+            className="rounded-full size-7.5 hover:bg-(--color-button-highlight-bg) flex items-center justify-center cursor-pointer"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemove?.(suggestion);
+            }}
+          >
+            <RemoveIcon className="size-4.5 stroke-none fill-(--color-accent)" />
+          </button>
         </div>
       </div>
     </Autocomplete.Item>
@@ -187,12 +200,12 @@ function SearchResultItem(props: { suggestion: Suggestion }) {
 function RecentSearchesHeader(props: { onRemoveAll?: () => void }) {
   const { onRemoveAll } = props;
   return (
-    <div className="flex items-center justify-between px-4 py-3">
+    <div className="flex items-center justify-between px-4 py-3 ">
       <div className="text-xl font-bold text-gray-900">Recent</div>
       {onRemoveAll && (
         <button
           type="button"
-          className="text-(--color-accent) font-bold cursor-pointer"
+          className="px-3 text-(--color-accent) text-sm font-bold cursor-pointer rounded-full hover:bg-(--color-button-highlight-bg) leading-5.5"
           onClick={onRemoveAll}
         >
           Clear all
