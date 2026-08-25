@@ -630,6 +630,35 @@ describe('<Popover.Trigger />', () => {
       expect(trigger.previousElementSibling).toHaveAttribute('data-base-ui-focus-guard');
       expect(trigger.nextElementSibling).toHaveAttribute('data-base-ui-focus-guard');
     });
+
+    it('completes an in-flight focus move outward once the popup is closed', async ({
+      onTestFinished,
+    }) => {
+      globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
+      onTestFinished(() => {
+        globalThis.BASE_UI_ANIMATIONS_DISABLED = true;
+      });
+
+      const { user } = await render(<AnimatedPopover />);
+      const trigger = screen.getByTestId('trigger');
+
+      await user.click(trigger);
+      await waitFor(() => expect(screen.getByTestId('inside')).toHaveFocus());
+
+      await user.keyboard('{Escape}');
+      expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+
+      // The guard outlives the close so it can finish a focus move the browser already started.
+      // Arriving from outside the positioner while open means "wrap into the popup", but once the
+      // popup is closed it is never a destination, so the move has to complete outward instead.
+      await act(async () => {
+        trigger.focus();
+        (trigger.nextElementSibling as HTMLElement).focus();
+      });
+
+      expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+      expect(screen.getByTestId('after')).toHaveFocus();
+    });
   });
 
   describe.skipIf(isJSDOM || !platform.engine.blink)('native tabbing while closing', () => {
@@ -744,6 +773,36 @@ describe('<Popover.Trigger />', () => {
       await pressTab(session, true);
       expect(trigger).toHaveFocus();
       expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+    });
+
+    it('completes forward tabbing when the focus-out close is canceled', async ({
+      onTestFinished,
+    }) => {
+      const { cdp } = await import('vitest/browser');
+      globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
+      onTestFinished(() => {
+        globalThis.BASE_UI_ANIMATIONS_DISABLED = true;
+      });
+
+      const onOpenChange = vi.fn(
+        (nextOpen: boolean, eventDetails: Popover.Root.ChangeEventDetails) => {
+          if (!nextOpen && eventDetails.reason === 'focus-out') {
+            eventDetails.cancel();
+          }
+        },
+      );
+      const { user } = await render(<AnimatedPopover onOpenChange={onOpenChange} />);
+      const session = cdp() as CDPSession;
+
+      await user.click(screen.getByTestId('trigger'));
+      await waitFor(() => expect(screen.getByTestId('inside')).toHaveFocus());
+
+      await pressTab(session);
+      expect(screen.getByTestId('after')).toHaveFocus();
+      expect(screen.getByTestId('popup')).not.toHaveAttribute('data-ending-style');
+      expect(screen.getByTestId('trigger').previousElementSibling).toHaveAttribute('tabindex', '0');
+      expect(screen.getByTestId('trigger').nextElementSibling).toHaveAttribute('tabindex', '0');
+      expect(onOpenChange).toHaveBeenCalledTimes(2);
     });
   });
 });

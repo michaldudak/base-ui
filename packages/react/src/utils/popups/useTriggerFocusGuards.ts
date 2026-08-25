@@ -6,9 +6,8 @@ import {
   activeElement,
   contains,
   type FocusableElement,
-  getTabbableAfterElement,
-  getTabbableBeforeElement,
   isOutsideEvent,
+  tabbable,
 } from '../../floating-ui-react/utils';
 import {
   type BaseUIChangeEventDetails,
@@ -57,64 +56,101 @@ export function useTriggerFocusGuards(
     }
   }
 
+  function requestCloseAndMoveFocus(
+    event: React.FocusEvent,
+    guard: HTMLElement,
+    destination: FocusableElement | null,
+  ) {
+    const eventDetails = createChangeEventDetails(REASONS.focusOut, event.nativeEvent, guard);
+    ReactDOM.flushSync(() => {
+      store.setOpen(false, eventDetails);
+    });
+
+    // Native Tab has already crossed the guard, so complete the move even if the consumer keeps
+    // the popup open by canceling the close request.
+    focusOrRelease(destination, guard);
+  }
+
+  function getOutsideTabbable(
+    referenceElement: Element | null,
+    direction: -1 | 1,
+    positionerElement: HTMLElement | null,
+  ) {
+    if (!referenceElement) {
+      return null;
+    }
+
+    const tabbableElements = tabbable(ownerDocument(referenceElement).body);
+    const referenceIndex = tabbableElements.indexOf(referenceElement as FocusableElement);
+    if (referenceIndex === -1) {
+      return null;
+    }
+
+    // Capture the browser's intended destination before requesting close. Internal focus guards
+    // and popup descendants can still be tabbable at this point, but they are routing machinery,
+    // not destinations. Using one snapshot also keeps the result stable when a close is canceled
+    // or React temporarily detaches refs while committing the closed state.
+    for (
+      let candidateIndex = referenceIndex + direction;
+      candidateIndex >= 0 && candidateIndex < tabbableElements.length;
+      candidateIndex += direction
+    ) {
+      const candidate = tabbableElements[candidateIndex];
+      if (
+        !candidate.hasAttribute('data-base-ui-focus-guard') &&
+        !contains(positionerElement, candidate)
+      ) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
   function handlePreFocusGuardFocus(event: React.FocusEvent) {
     const guard = event.currentTarget as HTMLElement;
+    const isOpen = store.select('open');
+    const relatedTarget = event.relatedTarget as Element | null;
+    const positionerElement = store.select('positionerElement');
+    const previousTabbable = getOutsideTabbable(
+      isOpen ? guard : (relatedTarget ?? triggerElementRef.current),
+      -1,
+      positionerElement,
+    );
 
     // Focus can already be moving to this guard when focusout closes the popup. The guard remains
     // connected for that event but is no longer tabbable; finish the pending backward move without
     // emitting a second close.
-    if (!store.select('open')) {
-      focusOrRelease(getTabbableBeforeElement(triggerElementRef.current, false), guard);
+    if (!isOpen) {
+      focusOrRelease(previousTabbable, guard);
       return;
     }
 
-    const previousTabbable = getTabbableBeforeElement(preFocusGuardRef.current, false);
-
-    ReactDOM.flushSync(() => {
-      store.setOpen(false, createChangeEventDetails(REASONS.focusOut, event.nativeEvent, guard));
-    });
-
-    // Popover keeps this guard connected but removes it from sequential navigation at close;
-    // Menu unmounts it. Resolve the previous element before either update happens.
-    focusOrRelease(previousTabbable, guard);
-  }
-
-  function getTabbableAfterTrigger(positionerElement: HTMLElement | null) {
-    let nextTabbable: FocusableElement | null = getTabbableAfterElement(
-      triggerElementRef.current,
-      false,
-    );
-
-    // A non-inert closing popup remains in the DOM for its exit animation. Skip all of its
-    // descendants without wrapping back to the start of the document.
-    while (nextTabbable !== null && contains(positionerElement, nextTabbable)) {
-      nextTabbable = getTabbableAfterElement(nextTabbable, false);
-    }
-
-    return nextTabbable;
+    requestCloseAndMoveFocus(event, guard, previousTabbable);
   }
 
   function handleFocusTargetFocus(event: React.FocusEvent) {
     const positionerElement = store.select('positionerElement');
     const guard = event.currentTarget as HTMLElement;
 
-    // Mirror the pre-guard case for a forward move that was already in flight when focusout closed
-    // the popup. Subsequent Tab navigation skips this guard because its tabIndex is now -1.
+    // Focus can already be moving to this guard when focusout closes the popup. A closed popup is
+    // never a destination, so finish that move outward before considering a redirect into it.
+    // Subsequent Tab navigation skips this guard because its tabIndex is now -1.
     if (!store.select('open')) {
-      focusOrRelease(getTabbableAfterTrigger(positionerElement), guard);
+      focusOrRelease(getOutsideTabbable(triggerElementRef.current, 1, positionerElement), guard);
       return;
     }
 
+    // Arriving from outside the positioner while open means the user tabbed backwards past the
+    // trigger and should wrap into the popup instead of leaving it behind.
     if (positionerElement && isOutsideEvent(event, positionerElement)) {
       store.context.beforeContentFocusGuardRef.current?.focus();
       return;
     }
 
-    ReactDOM.flushSync(() => {
-      store.setOpen(false, createChangeEventDetails(REASONS.focusOut, event.nativeEvent, guard));
-    });
+    const nextTabbable = getOutsideTabbable(triggerElementRef.current, 1, positionerElement);
 
-    focusOrRelease(getTabbableAfterTrigger(positionerElement), guard);
+    requestCloseAndMoveFocus(event, guard, nextTabbable);
   }
 
   return { preFocusGuardRef, handlePreFocusGuardFocus, handleFocusTargetFocus };
