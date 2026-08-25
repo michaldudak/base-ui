@@ -473,6 +473,78 @@ describe('<Popover.Popup />', () => {
   );
 
   it.skipIf(isJSDOM)(
+    'still returns focus after reopening during an exit animation that moved focus away',
+    async ({ onTestFinished }) => {
+      globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
+      onTestFinished(() => {
+        globalThis.BASE_UI_ANIMATIONS_DISABLED = true;
+      });
+
+      function Test(props: { animate: boolean }) {
+        return (
+          <React.Fragment>
+            <style>
+              {`
+                .animated[data-ending-style] {
+                  animation: popover-reopen-exit 10s linear;
+                }
+
+                @keyframes popover-reopen-exit {
+                  to {
+                    opacity: 0;
+                  }
+                }
+              `}
+            </style>
+            <input data-testid="outside" />
+            <Popover.Root>
+              <Popover.Trigger data-testid="trigger">Open</Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Positioner>
+                  <Popover.Popup
+                    data-testid="popup"
+                    className={props.animate ? 'animated' : undefined}
+                  >
+                    <button type="button" data-testid="inside">
+                      Inside
+                    </button>
+                  </Popover.Popup>
+                </Popover.Positioner>
+              </Popover.Portal>
+            </Popover.Root>
+          </React.Fragment>
+        );
+      }
+
+      const { user, setProps } = await render(<Test animate />);
+      const trigger = screen.getByTestId('trigger');
+
+      await user.click(trigger);
+      await waitFor(() => expect(screen.getByTestId('inside')).toHaveFocus());
+
+      // Popover hands focus back at unmount, so it stays inside the closing popup.
+      await user.keyboard('{Escape}');
+      expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+
+      // Moving focus away during the exit animation suppresses the handoff for *that* dismissal.
+      const outside = screen.getByTestId('outside');
+      await user.click(outside);
+      expect(outside).toHaveFocus();
+
+      // Reopening reuses the same still-mounted focus manager, so the suppression must not carry
+      // over into the next session.
+      await user.click(trigger);
+      await waitFor(() => expect(screen.getByTestId('inside')).toHaveFocus());
+
+      await setProps({ animate: false });
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByTestId('popup')).toBe(null));
+
+      expect(trigger).toHaveFocus();
+    },
+  );
+
+  it.skipIf(isJSDOM)(
     'does not pull focus to finalFocus after a click moved it during the exit animation',
     async ({ onTestFinished }) => {
       globalThis.BASE_UI_ANIMATIONS_DISABLED = false;

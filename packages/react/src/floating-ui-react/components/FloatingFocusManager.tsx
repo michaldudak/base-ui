@@ -681,6 +681,10 @@ export function FloatingFocusManager(props: FloatingFocusManagerProps): React.JS
 
     closeTypeRef.current = '';
     lastInteractionTypeRef.current = '';
+    // A popup whose focus manager outlives the close (Popover, while it animates out) can be
+    // reopened on the same mount, so the return-focus cleanup that normally clears this has not
+    // run. Suppression belongs to the dismissal that set it, never to the next session.
+    preventReturnFocusRef.current = false;
 
     const doc = ownerDocument(floatingFocusElement);
     const previouslyFocusedElement = activeElement(doc);
