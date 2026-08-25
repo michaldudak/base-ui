@@ -472,6 +472,76 @@ describe('<Popover.Popup />', () => {
     },
   );
 
+  it.skipIf(isJSDOM)(
+    'does not pull focus to finalFocus after a click moved it during the exit animation',
+    async ({ onTestFinished }) => {
+      globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
+      onTestFinished(() => {
+        globalThis.BASE_UI_ANIMATIONS_DISABLED = true;
+      });
+
+      function Test() {
+        const finalFocusRef = React.useRef<HTMLButtonElement>(null);
+        return (
+          <React.Fragment>
+            <style>
+              {`
+                [data-ending-style] {
+                  animation: popover-final-focus-exit 500ms linear;
+                }
+
+                @keyframes popover-final-focus-exit {
+                  to {
+                    opacity: 0;
+                  }
+                }
+              `}
+            </style>
+            <button type="button" ref={finalFocusRef} data-testid="final-focus">
+              Final focus
+            </button>
+            <button type="button" data-testid="elsewhere">
+              Elsewhere
+            </button>
+            <Popover.Root>
+              <Popover.Trigger data-testid="trigger">Open</Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Positioner>
+                  <Popover.Popup data-testid="popup" finalFocus={finalFocusRef}>
+                    <button type="button" data-testid="inside">
+                      Inside
+                    </button>
+                  </Popover.Popup>
+                </Popover.Positioner>
+              </Popover.Portal>
+            </Popover.Root>
+          </React.Fragment>
+        );
+      }
+
+      const { user } = await render(<Test />);
+
+      await user.click(screen.getByTestId('trigger'));
+      const inside = await screen.findByTestId('inside');
+      await waitFor(() => expect(inside).toHaveFocus());
+
+      // Escape leaves focus inside the closing popup, so the click below is the user's own
+      // deliberate focus move rather than the popup handing focus off.
+      await user.keyboard('{Escape}');
+      expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+
+      const elsewhere = screen.getByTestId('elsewhere');
+      await user.click(elsewhere);
+      expect(elsewhere).toHaveFocus();
+
+      // An explicit `finalFocus` must not claw focus back off the control the user just clicked
+      // when the popup finally unmounts.
+      await waitFor(() => expect(screen.queryByTestId('popup')).toBe(null));
+      expect(elsewhere).toHaveFocus();
+      expect(screen.getByTestId('final-focus')).not.toHaveFocus();
+    },
+  );
+
   describe('prop: finalFocus', () => {
     it('should focus the trigger by default when closed', async () => {
       await render(

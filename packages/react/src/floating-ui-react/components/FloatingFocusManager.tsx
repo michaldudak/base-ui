@@ -547,19 +547,26 @@ export function FloatingFocusManager(props: FloatingFocusManagerProps): React.JS
           // Allow closing when `isUntrappedTypeableCombobox` regardless of the previously focused element.
           (isUntrappedTypeableCombobox || relatedTarget !== getPreviouslyFocusedElement())
         ) {
-          // A popup kept mounted for its exit animation is already closed; emitting another
-          // close would fire `onOpenChange` twice for one dismissal and stamp `data-instant`,
-          // cancelling the exit transition.
+          // Focus moved away deliberately, so the close-time handoff must not claw it back, even
+          // when the popup is already closed and only animating out.
+          preventReturnFocusRef.current = true;
+
+          // Only the close itself is redundant once the popup is closed: emitting another would
+          // fire `onOpenChange` twice for one dismissal and stamp `data-instant`, cancelling the
+          // exit transition.
           if (store.state.open) {
-            preventReturnFocusRef.current = true;
             store.setOpen(false, createChangeEventDetails(REASONS.focusOut, event));
           }
         }
       });
     }
 
+    // https://github.com/floating-ui/floating-ui/issues/3060: focus moving to another part of the
+    // React tree must not read as leaving the popup. Once the popup is closed there is no close
+    // left to suppress, and swallowing the focus-out would lose the record that the user moved
+    // focus themselves — which is what keeps the close-time handoff from clawing it back.
     function markInsideReactTree() {
-      if (pointerDownOutsideRef.current) {
+      if (pointerDownOutsideRef.current || !store.state.open) {
         return;
       }
       dataRef.current.insideReactTree = true;
