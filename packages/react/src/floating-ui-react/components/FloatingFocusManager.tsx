@@ -964,11 +964,13 @@ export function FloatingFocusManager(props: FloatingFocusManagerProps): React.JS
     };
   }, [disabled, floatingFocusElement]);
 
-  // Gated on `open`, not just `mounted`: a guard is `tabindex="0"` + `aria-hidden="true"`, so one
-  // left behind during the exit animation is focusable in its own right. Positioner-based popups
-  // nest their guards in the inert subtree, but Dialog and Drawer put `inert` on the popup itself.
+  // A guard is `tabindex="0"` + `aria-hidden="true"`, so one left behind after the popup closes is
+  // focusable in its own right. `disabled` is what drops them: every popup that hands focus back at
+  // close passes `disabled={!open}`, so its guards go in the same commit. A popup that keeps its
+  // focus manager past the close (Popover, while it animates out) still needs them, to catch a Tab
+  // out of the subtree it is still holding focus in.
   const shouldRenderGuards =
-    open && !disabled && (modal ? !isUntrappedTypeableCombobox : true) && (isInsidePortal || modal);
+    !disabled && (modal ? !isUntrappedTypeableCombobox : true) && (isInsidePortal || modal);
 
   return (
     <React.Fragment>

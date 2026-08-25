@@ -775,6 +775,37 @@ describe('<Popover.Trigger />', () => {
       expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
     });
 
+    it('tabs out of a popup that still holds focus while animating out', async ({
+      onTestFinished,
+    }) => {
+      const { cdp } = await import('vitest/browser');
+      globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
+      onTestFinished(() => {
+        globalThis.BASE_UI_ANIMATIONS_DISABLED = true;
+      });
+
+      const { user } = await render(<AnimatedPopover />);
+      const session = cdp() as CDPSession;
+      const trigger = screen.getByTestId('trigger');
+
+      await user.click(trigger);
+      const inside = await screen.findByTestId('inside');
+      await waitFor(() => expect(inside).toHaveFocus());
+
+      // Escape leaves focus inside the closing popup: Popover hands focus back at unmount rather
+      // than at close, and its positioner never goes inert.
+      await user.keyboard('{Escape}');
+      expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+      expect(inside).toHaveFocus();
+
+      // The focus manager is still enabled here, so its guards must still be mounted to catch this
+      // Tab and route it past the trigger. Without them the portal is the last thing in the
+      // document and focus leaves the page entirely.
+      await pressTab(session);
+      expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+      expect(screen.getByTestId('after')).toHaveFocus();
+    });
+
     it('completes forward tabbing when the focus-out close is canceled', async ({
       onTestFinished,
     }) => {
