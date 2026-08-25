@@ -522,6 +522,60 @@ describe('<Popover.Trigger />', () => {
     },
   );
 
+  it.skipIf(isJSDOM)(
+    'tabs past a trigger that stopped being tabbable while the popup was open',
+    async () => {
+      function Test() {
+        const [busy, setBusy] = React.useState(false);
+        return (
+          <React.Fragment>
+            <button type="button" data-testid="before">
+              Before
+            </button>
+            <Popover.Root>
+              <Popover.Trigger data-testid="trigger" disabled={busy}>
+                Open
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Positioner>
+                  <Popover.Popup data-testid="popup">
+                    <button type="button" data-testid="inside" onClick={() => setBusy(true)}>
+                      Start
+                    </button>
+                  </Popover.Popup>
+                </Popover.Positioner>
+              </Popover.Portal>
+            </Popover.Root>
+            <button type="button" data-testid="after">
+              After
+            </button>
+          </React.Fragment>
+        );
+      }
+
+      const { user } = await render(<Test />);
+      const trigger = screen.getByTestId('trigger');
+
+      await user.click(trigger);
+      const inside = await screen.findByTestId('inside');
+
+      // An action inside the popup disables the trigger, taking it out of the tab order while the
+      // popup stays open.
+      await user.click(inside);
+      expect(trigger).toBeDisabled();
+
+      // Mirrors what the focus manager's after-guard does when Tab reaches the end of the popup:
+      // it forwards focus to the trigger's trailing guard, which then has to resolve where the
+      // browser was heading. The trigger itself can no longer answer that.
+      await act(async () => {
+        inside.focus();
+        (trigger.nextElementSibling as HTMLElement).focus();
+      });
+
+      expect(screen.getByTestId('after')).toHaveFocus();
+    },
+  );
+
   describe.skipIf(isJSDOM)('exit animation', () => {
     const style = `
       @keyframes popover-close-test {

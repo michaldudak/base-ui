@@ -147,7 +147,10 @@ export function useTriggerFocusGuards(
       return;
     }
 
-    const nextTabbable = getOutsideTabbable(triggerElementRef.current, 1, positionerElement);
+    // Anchor on the guard rather than the trigger, mirroring the backward direction. The guard is
+    // always in the tab order while the popup is open, whereas the trigger may have left it — a
+    // disabled trigger is dropped by `tabbable()`, which would resolve to no destination at all.
+    const nextTabbable = getOutsideTabbable(guard, 1, positionerElement);
 
     requestCloseAndMoveFocus(event, guard, nextTabbable);
   }
