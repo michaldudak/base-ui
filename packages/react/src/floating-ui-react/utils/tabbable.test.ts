@@ -1,11 +1,6 @@
 import { isJSDOM } from '#test-utils';
 import { visuallyHidden, visuallyHiddenInput } from '@base-ui/utils/visuallyHidden';
-import {
-  getTabbableAfterElement,
-  getTabbableBeforeElement,
-  isTabbable,
-  tabbable,
-} from './tabbable';
+import { getTabbableAfterElement, isTabbable, tabbable } from './tabbable';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -382,16 +377,10 @@ it('treats slotted elements inside inert shadow content as untabbable', () => {
   expect(tabbable(document.body)).not.toContain(button);
 });
 
-it('optionally does not wrap when finding a nearby tabbable element', () => {
+it('wraps when finding the tabbable element after the last one', () => {
   const first = document.createElement('button');
-  const middle = document.createElement('button');
   const last = document.createElement('button');
-  document.body.append(first, middle, last);
+  document.body.append(first, last);
 
-  expect(getTabbableBeforeElement(first)).toBe(last);
-  expect(getTabbableBeforeElement(first, false)).toBe(null);
   expect(getTabbableAfterElement(last)).toBe(first);
-  expect(getTabbableAfterElement(last, false)).toBe(null);
-  expect(getTabbableBeforeElement(middle, false)).toBe(first);
-  expect(getTabbableAfterElement(middle, false)).toBe(last);
 });

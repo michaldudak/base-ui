@@ -223,7 +223,7 @@ export function getPreviousTabbable(referenceElement: Element | null): Focusable
   );
 }
 
-function getTabbableNearElement(referenceElement: Element | null, dir: 1 | -1, wrap: boolean) {
+export function getTabbableAfterElement(referenceElement: Element | null): FocusableElement | null {
   if (!referenceElement) {
     return null;
   }
@@ -239,34 +239,7 @@ function getTabbableNearElement(referenceElement: Element | null, dir: 1 | -1, w
     return null;
   }
 
-  const nextIndex = index + dir;
-  if (!wrap) {
-    return list[nextIndex] ?? null;
-  }
-
-  return list[(nextIndex + elementCount) % elementCount];
-}
-
-/**
- * The tabbable element following `referenceElement` in the document.
- * @param wrap - whether to continue from the first tabbable element when there is none after it.
- */
-export function getTabbableAfterElement(
-  referenceElement: Element | null,
-  wrap: boolean = true,
-): FocusableElement | null {
-  return getTabbableNearElement(referenceElement, 1, wrap);
-}
-
-/**
- * The tabbable element preceding `referenceElement` in the document.
- * @param wrap - whether to continue from the last tabbable element when there is none before it.
- */
-export function getTabbableBeforeElement(
-  referenceElement: Element | null,
-  wrap: boolean = true,
-): FocusableElement | null {
-  return getTabbableNearElement(referenceElement, -1, wrap);
+  return list[(index + 1) % elementCount];
 }
 
 export function isOutsideEvent(event: FocusEvent | React.FocusEvent, container?: Element) {

@@ -369,12 +369,7 @@ export function popupConformanceTests(config: PopupTestConfig) {
 }
 
 function isInert(element: Element | null) {
-  for (let node = element; node != null; node = node.parentElement) {
-    if (node.hasAttribute('inert')) {
-      return true;
-    }
-  }
-  return false;
+  return element?.closest('[inert]') != null;
 }
 
 function getTrigger() {

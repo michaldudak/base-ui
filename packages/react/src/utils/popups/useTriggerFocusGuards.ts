@@ -25,7 +25,6 @@ interface TriggerFocusGuardStore {
   select(key: 'open'): boolean;
   context: {
     readonly beforeContentFocusGuardRef: React.RefObject<HTMLElement | null>;
-    readonly triggerFocusTargetRef: React.RefObject<HTMLElement | null>;
   };
 }
 
