@@ -616,9 +616,7 @@ describe('<Popover.Trigger />', () => {
       );
     }
 
-    it('does not strand focus when a hover-opened popup animates out', async ({
-      onTestFinished,
-    }) => {
+    it('hands focus back when a hover-opened popup animates out', async ({ onTestFinished }) => {
       globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
       onTestFinished(() => {
         globalThis.BASE_UI_ANIMATIONS_DISABLED = true;
@@ -653,10 +651,10 @@ describe('<Popover.Trigger />', () => {
       await user.keyboard('{Escape}');
       expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
 
-      // A hover-opened popup runs with its focus manager disabled, so nothing hands focus back on
-      // close. Going inert would blur the focused element and leave nothing focused at all.
-      expect(screen.getByTestId('positioner')).not.toHaveAttribute('inert');
-      expect(inside).toHaveFocus();
+      // A hover session runs a focus manager too, so it hands focus back at close and the closed
+      // subtree can go inert like every other focus-managed session.
+      expect(screen.getByTestId('positioner')).toHaveAttribute('inert');
+      await waitFor(() => expect(screen.getByTestId('trigger')).toHaveFocus());
     });
 
     it('keeps the trigger focus guards mounted while the popup animates out', async ({
@@ -829,7 +827,7 @@ describe('<Popover.Trigger />', () => {
       expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
     });
 
-    it('tabs out of a popup that still holds focus while animating out', async ({
+    it('hands focus back and keeps tab order intact while animating out', async ({
       onTestFinished,
     }) => {
       const { cdp } = await import('vitest/browser');
@@ -846,15 +844,14 @@ describe('<Popover.Trigger />', () => {
       const inside = await screen.findByTestId('inside');
       await waitFor(() => expect(inside).toHaveFocus());
 
-      // Escape leaves focus inside the closing popup: Popover hands focus back at unmount rather
-      // than at close, and its positioner never goes inert.
+      // Popover now hands focus back at close, like every other focus-managed popup, rather than
+      // leaving it parked in the subtree that is animating out.
       await user.keyboard('{Escape}');
       expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
-      expect(inside).toHaveFocus();
+      expect(trigger).toHaveFocus();
 
-      // The focus manager is still enabled here, so its guards must still be mounted to catch this
-      // Tab and route it past the trigger. Without them the portal is the last thing in the
-      // document and focus leaves the page entirely.
+      // Tab continues from the trigger through ordinary tab order while the popup is still
+      // animating out; the closed subtree is inert, so nothing in it can be reached.
       await pressTab(session);
       expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
       expect(screen.getByTestId('after')).toHaveFocus();

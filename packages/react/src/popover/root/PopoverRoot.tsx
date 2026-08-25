@@ -1,6 +1,7 @@
 'use client';
 import * as React from 'react';
 import { fastComponent } from '@base-ui/utils/fastHooks';
+import { useIsoLayoutEffect } from '@base-ui/utils/useIsoLayoutEffect';
 import { useDismiss, FloatingTree } from '../../floating-ui-react';
 import { PopoverRootContext, usePopoverRootContext } from './PopoverRootContext';
 import { PopoverStore, type State as PopoverStoreState } from '../store/PopoverStore';
@@ -45,6 +46,29 @@ const PopoverRootComponent = fastComponent(function PopoverRootComponent<Payload
     triggerIdProp,
   });
 
+  // Registered before `useControlledProp` so it observes raw `open` before that effect writes
+  // `openProp` into the store.
+  //
+  // The effective open state is `openProp ?? open`, and `setOpen` writes raw `open` only after the
+  // consumer declined to cancel. So when a controlled prop changes, raw `open` already matching it
+  // means an interaction request was accepted and the session keeps the reason that request
+  // recorded. A mismatch means the parent moved the state itself: a programmatic session with no
+  // interaction reason.
+  useIsoLayoutEffect(() => {
+    if (openProp === undefined || store.state.open === openProp) {
+      return;
+    }
+
+    if (openProp) {
+      store.update({ open: true, openReason: null });
+    } else {
+      // Mirror a direct close into raw `open`, otherwise the next direct open would look like
+      // acceptance of this one. The session reason survives until unmount: the popup is still
+      // closing, and everything gated on it must keep behaving the way the session started.
+      store.set('open', false);
+    }
+  }, [store, openProp]);
+
   store.useControlledProp('openProp', openProp);
   store.useControlledProp('triggerIdProp', triggerIdProp);
 
@@ -58,7 +82,8 @@ const PopoverRootComponent = fastComponent(function PopoverRootComponent<Payload
   usePopupRootSync(store, open);
   useImplicitActiveTrigger(store);
   const { forceUnmount } = useOpenStateTransitions(open, store, () => {
-    store.update({ stickIfOpen: true, openChangeReason: null });
+    // Physical unmount ends the session, so the latched classification goes with it.
+    store.update({ stickIfOpen: true, openChangeReason: null, openReason: null });
   });
 
   store.useSyncedValues({

@@ -44,8 +44,7 @@ export const PopoverPopup = React.forwardRef(function PopoverPopup(
   const titleId = store.useState('titleElementId');
   const descriptionId = store.useState('descriptionElementId');
   const modal = store.useState('modal');
-  const mounted = store.useState('mounted');
-  const openReason = store.useState('openChangeReason');
+  const openReason = store.useState('openReason');
   const activeTriggerElement = store.useState('activeTriggerElement');
   const floatingContext = store.useState('floatingRootContext');
   const floatingId = floatingContext.useState('floatingId');
@@ -68,7 +67,11 @@ export const PopoverPopup = React.forwardRef(function PopoverPopup(
   const resolvedInitialFocus =
     initialFocus === undefined ? createDefaultInitialFocus(store.context.popupRef) : initialFocus;
 
-  const focusManagerModal = modal !== false && hasClosePart;
+  // A hover session runs a manager too, so it can hand focus back at close and let the closed
+  // subtree go inert. What it must not do is take focus on open or trap it, which is what
+  // `disabled` used to suppress wholesale.
+  const hoverSession = openReason === REASONS.triggerHover;
+  const focusManagerModal = !hoverSession && modal !== false && hasClosePart;
   store.useSyncedValue('focusManagerModal', focusManagerModal);
 
   const setPopupElement = store.useStateSetter('popupElement');
@@ -109,8 +112,9 @@ export const PopoverPopup = React.forwardRef(function PopoverPopup(
       context={floatingContext}
       openInteractionType={openMethod}
       modal={focusManagerModal}
-      disabled={!mounted || openReason === REASONS.triggerHover}
-      initialFocus={resolvedInitialFocus}
+      disabled={!open}
+      initialFocus={hoverSession ? false : resolvedInitialFocus}
+      focusActivationKey={openReason}
       returnFocus={finalFocus}
       restoreFocus="popup"
       previousFocusableElement={

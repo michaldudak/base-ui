@@ -162,6 +162,16 @@ export interface FloatingFocusManagerProps {
    */
   disabled?: boolean | undefined;
   /**
+   * Identifies the current activation. Changing it re-runs initial focus without remounting, for a
+   * popup that stays open while the way it was activated changes — a hover-opened Popover promoted
+   * to a press session, which must now take focus even though `open` and `disabled` did not move.
+   *
+   * Deliberately excluded from the return-focus effect: a mid-life change there would run its
+   * cleanup and hand focus back while the popup is still open.
+   * @internal
+   */
+  focusActivationKey?: string | null | undefined;
+  /**
    * Determines the element to focus when the floating element is opened.
    *
    * - `false`: Do not move focus.
@@ -253,6 +263,7 @@ export function FloatingFocusManager(props: FloatingFocusManagerProps): React.JS
     context,
     children,
     disabled = false,
+    focusActivationKey,
     initialFocus = true,
     returnFocus = true,
     restoreFocus = false,
@@ -681,9 +692,9 @@ export function FloatingFocusManager(props: FloatingFocusManagerProps): React.JS
 
     closeTypeRef.current = '';
     lastInteractionTypeRef.current = '';
-    // A popup whose focus manager outlives the close (Popover, while it animates out) can be
-    // reopened on the same mount, so the return-focus cleanup that normally clears this has not
-    // run. Suppression belongs to the dismissal that set it, never to the next session.
+    // Suppression belongs to the dismissal that set it, never to the next session. Clearing it on
+    // open makes that a per-session invariant rather than something inferred from the return-focus
+    // cleanup having already run.
     preventReturnFocusRef.current = false;
 
     const doc = ownerDocument(floatingFocusElement);
@@ -754,6 +765,7 @@ export function FloatingFocusManager(props: FloatingFocusManagerProps): React.JS
   }, [
     disabled,
     open,
+    focusActivationKey,
     floatingFocusElement,
     getTabbableContent,
     initialFocusRef,
@@ -976,10 +988,9 @@ export function FloatingFocusManager(props: FloatingFocusManagerProps): React.JS
   }, [disabled, floatingFocusElement]);
 
   // A guard is `tabindex="0"` + `aria-hidden="true"`, so one left behind after the popup closes is
-  // focusable in its own right. `disabled` is what drops them: every popup that hands focus back at
-  // close passes `disabled={!open}`, so its guards go in the same commit. A popup that keeps its
-  // focus manager past the close (Popover, while it animates out) still needs them, to catch a Tab
-  // out of the subtree it is still holding focus in.
+  // focusable in its own right. `disabled` is what drops them, and every popup passes
+  // `disabled={!open}`, so the guards go in the same commit as the close — alongside the focus
+  // handoff that empties the subtree they were guarding.
   const shouldRenderGuards =
     !disabled && (modal ? !isUntrappedTypeableCombobox : true) && (isInsidePortal || modal);
 

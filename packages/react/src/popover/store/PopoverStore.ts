@@ -28,6 +28,18 @@ export type State<Payload> = PopupStoreState<Payload> & {
   focusManagerModal: boolean;
   openMethod: InteractionType | null;
   openChangeReason: PopoverRoot.ChangeEventReason | null;
+  /**
+   * How the current session was opened, latched for as long as the popup stays mounted.
+   *
+   * `openChangeReason` becomes the *close* reason the moment the popup closes, so it cannot answer
+   * "how was this opened?" during an exit animation. Everything that must keep behaving the way the
+   * session started reads this instead: the focus manager's modal mode and initial focus, both
+   * backdrops, and the trigger's hover and pressed rules.
+   *
+   * `inert` is not one of them — a closed popup is inert regardless of how it was opened, because
+   * every session now hands focus back at close.
+   */
+  openReason: PopoverRoot.ChangeEventReason | null;
   stickIfOpen: boolean;
   titleElementId: string | undefined;
   descriptionElementId: string | undefined;
@@ -49,6 +61,7 @@ const selectors = {
   instantType: (state: State<unknown>) => state.instantType,
   openMethod: (state: State<unknown>) => state.openMethod,
   openChangeReason: (state: State<unknown>) => state.openChangeReason,
+  openReason: (state: State<unknown>) => state.openReason,
   modal: (state: State<unknown>) => state.modal,
   focusManagerModal: (state: State<unknown>) => state.focusManagerModal,
   stickIfOpen: (state: State<unknown>) => state.stickIfOpen,
@@ -137,9 +150,15 @@ export class PopoverStore<Payload> extends ReactStore<
         shouldPreventUnmountOnClose(),
       ) as ReturnType<typeof createPopupOpenState> & {
         openChangeReason: PopoverRoot.ChangeEventReason;
+        openReason: PopoverRoot.ChangeEventReason | null;
       };
 
       popupOpenState.openChangeReason = eventDetails.reason;
+      // Every accepted open request reclassifies the session, not just a closed -> open edge: an
+      // impatient click on a hover-opened popover promotes it to a press session. A close carries
+      // the classification forward, because everything gated on it has to keep behaving the way the
+      // session started until the popup actually unmounts.
+      popupOpenState.openReason = nextOpen ? eventDetails.reason : this.state.openReason;
       this.update(popupOpenState);
     };
 
@@ -200,6 +219,7 @@ function createInitialState<Payload>(
     instantType: undefined,
     openMethod: null,
     openChangeReason: null,
+    openReason: null,
     titleElementId: undefined,
     descriptionElementId: undefined,
     stickIfOpen: true,

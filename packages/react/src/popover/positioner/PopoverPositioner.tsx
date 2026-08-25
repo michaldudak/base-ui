@@ -58,7 +58,7 @@ export const PopoverPositioner = React.forwardRef(function PopoverPositioner(
   const floatingRootContext = store.useState('floatingRootContext');
   const mounted = store.useState('mounted');
   const open = store.useState('open');
-  const openReason = store.useState('openChangeReason');
+  const openReason = store.useState('openReason');
   const triggerElement = store.useState('activeTriggerElement');
   const modal = store.useState('modal');
   const openMethod = store.useState('openMethod');
@@ -147,9 +147,7 @@ export const PopoverPositioner = React.forwardRef(function PopoverPositioner(
     props: elementProps,
     refs: [forwardedRef, setPositionerElement],
     hidden: !mounted,
-    // Popover can open with its focus manager disabled, so it does not have one focus handoff
-    // contract shared by every open method. Keep hit testing separate from native `inert`.
-    pointerEventsNone: !open,
+    inert: !open,
   });
 
   return (

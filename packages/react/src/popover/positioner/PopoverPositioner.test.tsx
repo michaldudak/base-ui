@@ -514,7 +514,7 @@ describe('<Popover.Positioner />', () => {
   });
 
   it.skipIf(isJSDOM)(
-    'remains anchored and only blocks hit testing when closing from a tooltip trigger',
+    'remains anchored and goes inert when closing from a tooltip trigger',
     async () => {
       const testPopover = Popover.createHandle();
 
@@ -581,7 +581,9 @@ describe('<Popover.Positioner />', () => {
       const closingRect = positioner.getBoundingClientRect();
       expect(Math.abs(closingRect.x - initialRect.x)).toBeLessThanOrEqual(1);
       expect(Math.abs(closingRect.y - initialRect.y)).toBeLessThanOrEqual(1);
-      expect(positioner).not.toHaveAttribute('inert');
+      // Not a hover session — the root is opened controlled — so the closed subtree goes inert
+      // while it keeps its anchored position.
+      expect(positioner).toHaveAttribute('inert');
       expect(positioner.style.pointerEvents).toBe('none');
     },
   );

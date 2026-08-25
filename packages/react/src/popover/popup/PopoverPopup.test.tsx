@@ -412,7 +412,7 @@ describe('<Popover.Popup />', () => {
   });
 
   it.skipIf(isJSDOM)(
-    'returns focus after a hover-opened popup finishes animating out',
+    'returns focus when a hover-opened popup starts animating out',
     async ({ onTestFinished }) => {
       globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
       onTestFinished(() => {
@@ -462,8 +462,9 @@ describe('<Popover.Popup />', () => {
       await waitFor(() => {
         expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
       });
-      expect(screen.getByTestId('positioner')).not.toHaveAttribute('inert');
-      expect(inside).toHaveFocus();
+      // The handoff runs at close now, not at unmount, so the closed subtree can go inert.
+      expect(screen.getByTestId('positioner')).toHaveAttribute('inert');
+      await waitFor(() => expect(trigger).toHaveFocus());
 
       await waitFor(() => {
         expect(screen.queryByTestId('popup')).toBe(null);
@@ -522,7 +523,7 @@ describe('<Popover.Popup />', () => {
       await user.click(trigger);
       await waitFor(() => expect(screen.getByTestId('inside')).toHaveFocus());
 
-      // Popover hands focus back at unmount, so it stays inside the closing popup.
+      // Closing hands focus back to the trigger and the closed subtree goes inert.
       await user.keyboard('{Escape}');
       expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
 

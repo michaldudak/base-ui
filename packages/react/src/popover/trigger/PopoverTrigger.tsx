@@ -75,14 +75,26 @@ export const PopoverTrigger = fastComponentRef(function PopoverTrigger(
     },
   );
 
-  const openReason = store.useState('openChangeReason');
+  const openReason = store.useState('openReason');
   const stickIfOpen = store.useState('stickIfOpen');
   const openMethod = store.useState('openMethod');
   const focusManagerModal = store.useState('focusManagerModal');
+  const open = store.useState('open');
+  const mounted = store.useState('mounted');
+  const preventUnmountingOnClose = store.useState('preventUnmountingOnClose');
+
+  // A popup retained by `preventUnmountOnClose` stays mounted indefinitely, so `mounted && !open`
+  // is not by itself "still animating out" — treating it that way would disable hover reopening for
+  // good. Only a normally-closing non-hover session suppresses hover; a hover session stays enabled
+  // throughout so the user can immediately re-hover.
+  const isNormallyClosing = mounted && !open && !preventUnmountingOnClose;
+  const isTouchPressSession = openMethod === 'touch' && openReason === REASONS.triggerPress;
 
   const hoverProps = useHoverReferenceInteraction(floatingContext, {
     enabled:
-      !disabled && openOnHover && (openMethod !== 'touch' || openReason !== REASONS.triggerPress),
+      !disabled &&
+      openOnHover &&
+      (openReason === REASONS.triggerHover || (!isNormallyClosing && !isTouchPressSession)),
     mouseOnly: true,
     move: false,
     handleClose: safePolygon(),
