@@ -195,6 +195,100 @@ export function tabbable(container: Element) {
   );
 }
 
+/**
+ * One composed-tree traversal that both collects the focusable elements and locates arbitrary
+ * anchor nodes among them.
+ *
+ * Anchor positions are recorded before focusability is considered, so a node that `focusable()`
+ * drops — a disabled trigger, an element inside an `inert` subtree, a guard that left the tab
+ * order — can still be used as the reference point for a directional search.
+ */
+export interface TabOrderSnapshot {
+  /** Focusable elements in composed-tree order. */
+  readonly elements: readonly FocusableElement[];
+  /**
+   * Index of the first focusable element at or after `anchor` (the anchor itself when it is
+   * focusable), or `-1` when the traversal never reached the anchor.
+   */
+  positionOf(anchor: Element | null | undefined): number;
+  /** Whether the element at `index` is reachable by sequential navigation. */
+  isTabbableAt(index: number): boolean;
+}
+
+function collectTabOrder(
+  container: ParentNode,
+  anchors: Set<Element>,
+  elements: FocusableElement[],
+  positions: Map<Element, number>,
+) {
+  getComposedChildren(container).forEach((child) => {
+    if (anchors.has(child)) {
+      positions.set(child, elements.length);
+    }
+
+    if (isFocusableElement(child)) {
+      elements.push(child);
+    }
+
+    collectTabOrder(child, anchors, elements, positions);
+  });
+}
+
+export function createTabOrderSnapshot(
+  container: Element,
+  anchors: ReadonlyArray<Element | null | undefined>,
+): TabOrderSnapshot {
+  const anchorSet = new Set<Element>();
+  anchors.forEach((anchor) => {
+    if (anchor) {
+      anchorSet.add(anchor);
+    }
+  });
+
+  const elements: FocusableElement[] = [];
+  const positions = new Map<Element, number>();
+  collectTabOrder(container, anchorSet, elements, positions);
+
+  return {
+    elements,
+    positionOf(anchor) {
+      return (anchor && positions.get(anchor)) ?? -1;
+    },
+    isTabbableAt(index) {
+      const element = elements[index];
+      return element != null && getTabIndex(element) >= 0 && isTabbableRadio(element, elements);
+    },
+  };
+}
+
+/**
+ * Every tabbable element `isAcceptable` admits, walking away from `anchor` in `direction`, nearest
+ * first. The anchor itself is never returned and the walk does not wrap at the document boundary.
+ */
+export function collectTabbableFrom(
+  snapshot: TabOrderSnapshot,
+  anchor: Element | null | undefined,
+  direction: -1 | 1,
+  isAcceptable: (element: FocusableElement) => boolean,
+): FocusableElement[] {
+  const position = snapshot.positionOf(anchor);
+  if (position === -1) {
+    return [];
+  }
+
+  const result: FocusableElement[] = [];
+  const start = direction === 1 ? position : position - 1;
+
+  for (let index = start; index >= 0 && index < snapshot.elements.length; index += direction) {
+    const element = snapshot.elements[index];
+    if (element !== anchor && snapshot.isTabbableAt(index) && isAcceptable(element)) {
+      result.push(element);
+    }
+  }
+
+  return result;
+}
+
 function getTabbableIn(container: HTMLElement, dir: 1 | -1): FocusableElement | undefined {
   const list = tabbable(container);
   const len = list.length;

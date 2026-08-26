@@ -1,6 +1,13 @@
 import { isJSDOM } from '#test-utils';
 import { visuallyHidden, visuallyHiddenInput } from '@base-ui/utils/visuallyHidden';
-import { getTabbableAfterElement, isTabbable, tabbable } from './tabbable';
+import {
+  collectTabbableFrom,
+  createTabOrderSnapshot,
+  focusable,
+  getTabbableAfterElement,
+  isTabbable,
+  tabbable,
+} from './tabbable';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -383,4 +390,88 @@ it('wraps when finding the tabbable element after the last one', () => {
   document.body.append(first, last);
 
   expect(getTabbableAfterElement(last)).toBe(first);
+});
+
+describe('createTabOrderSnapshot', () => {
+  it('locates an anchor that is not focusable itself', () => {
+    const before = document.createElement('button');
+    const anchor = document.createElement('button');
+    anchor.disabled = true;
+    const after = document.createElement('button');
+    document.body.append(before, anchor, after);
+
+    const snapshot = createTabOrderSnapshot(document.body, [anchor]);
+
+    // A disabled element is dropped by the focusability filter, so an index lookup into
+    // `focusable()`/`tabbable()` cannot resolve it. Recording positions during the traversal can.
+    expect(focusable(document.body)).not.toContain(anchor);
+    expect(collectTabbableFrom(snapshot, anchor, 1, () => true)).toEqual([after]);
+    expect(collectTabbableFrom(snapshot, anchor, -1, () => true)).toEqual([before]);
+  });
+
+  it('locates an anchor inside an inert subtree', () => {
+    const anchor = document.createElement('button');
+    const wrapper = document.createElement('div');
+    const after = document.createElement('button');
+    wrapper.setAttribute('inert', '');
+    wrapper.appendChild(anchor);
+    document.body.append(wrapper, after);
+
+    const snapshot = createTabOrderSnapshot(document.body, [anchor]);
+
+    expect(focusable(document.body)).not.toContain(anchor);
+    expect(collectTabbableFrom(snapshot, anchor, 1, () => true)).toEqual([after]);
+  });
+
+  it('returns -1 for an anchor the traversal never reaches', () => {
+    const detached = document.createElement('button');
+    document.body.append(document.createElement('button'));
+
+    const snapshot = createTabOrderSnapshot(document.body, [detached]);
+
+    expect(snapshot.positionOf(detached)).toBe(-1);
+    expect(snapshot.positionOf(null)).toBe(-1);
+    expect(collectTabbableFrom(snapshot, detached, 1, () => true)).toEqual([]);
+  });
+
+  it('does not offer a focusable element that is out of the tab order as a destination', () => {
+    const anchor = document.createElement('button');
+    const programmatic = document.createElement('div');
+    programmatic.tabIndex = -1;
+    const after = document.createElement('button');
+    document.body.append(anchor, programmatic, after);
+
+    const snapshot = createTabOrderSnapshot(document.body, [anchor]);
+
+    // Popups carry `tabIndex: -1` so they can be focused programmatically. Sequential navigation
+    // never lands on them, so neither may a handoff.
+    expect(focusable(document.body)).toContain(programmatic);
+    expect(collectTabbableFrom(snapshot, anchor, 1, () => true)).toEqual([after]);
+  });
+
+  it('does not wrap at the document boundary', () => {
+    const first = document.createElement('button');
+    const last = document.createElement('button');
+    document.body.append(first, last);
+
+    const snapshot = createTabOrderSnapshot(document.body, [first, last]);
+
+    expect(collectTabbableFrom(snapshot, first, -1, () => true)).toEqual([]);
+    expect(collectTabbableFrom(snapshot, last, 1, () => true)).toEqual([]);
+  });
+
+  it('collects every accepted destination in order, nearest first', () => {
+    const anchor = document.createElement('button');
+    const skipped = document.createElement('button');
+    skipped.setAttribute('data-skip', '');
+    const first = document.createElement('button');
+    const second = document.createElement('button');
+    document.body.append(anchor, skipped, first, second);
+
+    const snapshot = createTabOrderSnapshot(document.body, [anchor]);
+
+    expect(
+      collectTabbableFrom(snapshot, anchor, 1, (element) => !element.hasAttribute('data-skip')),
+    ).toEqual([first, second]);
+  });
 });

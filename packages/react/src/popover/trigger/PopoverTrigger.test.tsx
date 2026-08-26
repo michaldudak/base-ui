@@ -711,6 +711,175 @@ describe('<Popover.Trigger />', () => {
       expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
       expect(screen.getByTestId('after')).toHaveFocus();
     });
+
+    it('completes an in-flight move when the close left the trigger out of the tab order', async ({
+      onTestFinished,
+    }) => {
+      globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
+      onTestFinished(() => {
+        globalThis.BASE_UI_ANIMATIONS_DISABLED = true;
+      });
+
+      function Test() {
+        const [busy, setBusy] = React.useState(false);
+        return (
+          <React.Fragment>
+            {/* eslint-disable-next-line react/no-danger */}
+            <style dangerouslySetInnerHTML={{ __html: style }} />
+            <button type="button" data-testid="before">
+              Before
+            </button>
+            <Popover.Root
+              onOpenChange={(nextOpen) => {
+                if (!nextOpen) {
+                  setBusy(true);
+                }
+              }}
+            >
+              <Popover.Trigger data-testid="trigger" disabled={busy}>
+                Open
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Positioner>
+                  <Popover.Popup data-testid="popup" className="animation-test-popup">
+                    <button type="button" data-testid="inside">
+                      Inside
+                    </button>
+                  </Popover.Popup>
+                </Popover.Positioner>
+              </Popover.Portal>
+            </Popover.Root>
+            <button type="button" data-testid="after">
+              After
+            </button>
+          </React.Fragment>
+        );
+      }
+
+      const { user } = await render(<Test />);
+      const trigger = screen.getByTestId('trigger');
+
+      await user.click(trigger);
+      await waitFor(() => expect(screen.getByTestId('inside')).toHaveFocus());
+
+      await user.keyboard('{Escape}');
+      expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+      expect(trigger).toBeDisabled();
+
+      // `tabbable()` drops a disabled trigger, so anchoring the search on the trigger resolves to
+      // no destination at all and the move ends on `<body>`. The guard is still connected and is
+      // the element the browser was actually moving through, so it anchors the search instead.
+      await act(async () => {
+        (trigger.nextElementSibling as HTMLElement).focus();
+      });
+
+      expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+      expect(screen.getByTestId('after')).toHaveFocus();
+    });
+
+    it('moves focus to a destination the close swapped in', async ({ onTestFinished }) => {
+      globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
+      onTestFinished(() => {
+        globalThis.BASE_UI_ANIMATIONS_DISABLED = true;
+      });
+
+      function Test() {
+        const [closed, setClosed] = React.useState(false);
+        return (
+          <React.Fragment>
+            {/* eslint-disable-next-line react/no-danger */}
+            <style dangerouslySetInnerHTML={{ __html: style }} />
+            <Popover.Root
+              onOpenChange={(nextOpen) => {
+                if (!nextOpen) {
+                  setClosed(true);
+                }
+              }}
+            >
+              <Popover.Trigger data-testid="trigger">Open</Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Positioner>
+                  <Popover.Popup data-testid="popup" className="animation-test-popup">
+                    <button type="button" data-testid="inside">
+                      Inside
+                    </button>
+                  </Popover.Popup>
+                </Popover.Positioner>
+              </Popover.Portal>
+            </Popover.Root>
+            {closed ? (
+              <button key="done" type="button" data-testid="done">
+                Done
+              </button>
+            ) : (
+              <button key="cancel" type="button" data-testid="cancel">
+                Cancel
+              </button>
+            )}
+          </React.Fragment>
+        );
+      }
+
+      const { user } = await render(<Test />);
+      const trigger = screen.getByTestId('trigger');
+
+      await user.click(trigger);
+      const inside = await screen.findByTestId('inside');
+      await waitFor(() => expect(inside).toHaveFocus());
+
+      // Tabbing forward out of the popup routes through the trigger's trailing guard, which
+      // requests the close. `onOpenChange` then replaces the button that was going to receive
+      // focus, so the destination captured before the close is gone by the time it is used.
+      await act(async () => {
+        (trigger.nextElementSibling as HTMLElement).focus();
+      });
+
+      expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+      expect(screen.getByTestId('done')).toHaveFocus();
+    });
+
+    it('releases focus at the document boundary instead of leaving it on a guard', async ({
+      onTestFinished,
+    }) => {
+      globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
+      onTestFinished(() => {
+        globalThis.BASE_UI_ANIMATIONS_DISABLED = true;
+      });
+
+      const { user } = await render(
+        <React.Fragment>
+          {/* eslint-disable-next-line react/no-danger */}
+          <style dangerouslySetInnerHTML={{ __html: style }} />
+          <Popover.Root>
+            <Popover.Trigger data-testid="trigger">Open</Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Positioner>
+                <Popover.Popup data-testid="popup" className="animation-test-popup">
+                  <button type="button" data-testid="inside">
+                    Inside
+                  </button>
+                </Popover.Popup>
+              </Popover.Positioner>
+            </Popover.Portal>
+          </Popover.Root>
+        </React.Fragment>,
+      );
+
+      const trigger = screen.getByTestId('trigger');
+      await user.click(trigger);
+      await waitFor(() => expect(screen.getByTestId('inside')).toHaveFocus());
+
+      // Nothing is tabbable before the trigger, so the backward move has no destination. The
+      // popup still closes, and focus must not be parked on the invisible guard.
+      const preGuard = trigger.previousElementSibling as HTMLElement;
+      await act(async () => {
+        preGuard.focus();
+      });
+
+      expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+      expect(preGuard).not.toHaveFocus();
+      expect(document.body).toHaveFocus();
+    });
   });
 
   describe.skipIf(isJSDOM || !platform.engine.blink)('native tabbing while closing', () => {
