@@ -598,10 +598,12 @@ describe('<Popover.Popup />', () => {
       const inside = await screen.findByTestId('inside');
       await waitFor(() => expect(inside).toHaveFocus());
 
-      // Escape leaves focus inside the closing popup, so the click below is the user's own
-      // deliberate focus move rather than the popup handing focus off.
+      // The handoff runs at close, so Escape moves focus to `finalFocus` straight away. That
+      // makes the click below the user's own deliberate move on top of it, rather than something
+      // the popup is still about to undo.
       await user.keyboard('{Escape}');
       expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+      await waitFor(() => expect(screen.getByTestId('final-focus')).toHaveFocus());
 
       const elsewhere = screen.getByTestId('elsewhere');
       await user.click(elsewhere);
