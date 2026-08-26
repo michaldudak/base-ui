@@ -331,6 +331,15 @@ export function AriaCombobox<Value = any, Mode extends SelectionMode = 'none', I
     state: 'open',
   });
 
+  // The reason of a close request that has not been settled yet. A controlled consumer can decline
+  // it, and `onOpenChange` fires before that decision is observable, so the reason only becomes the
+  // committed close reason once `open` has actually moved.
+  const pendingCloseReasonRef = React.useRef<AriaCombobox.ChangeEventReason | null>(null);
+  // Declining a controlled request changes no state of the consumer's own, and `useControlled`'s
+  // setter is inert while controlled, so nothing would re-render to settle the pending reason.
+  // Bumping this forces exactly one pass, whether the request is accepted or declined.
+  const [controlledRequestVersion, setControlledRequestVersion] = React.useState(0);
+
   const isGrouped = isGroupedItems(items);
   const query = !open && closeQuery !== null ? closeQuery : String(inputValue).trim();
 
@@ -468,6 +477,7 @@ export function AriaCombobox<Value = any, Mode extends SelectionMode = 'none', I
       labelId: undefined,
       selectedValue,
       open,
+      closeReason: null,
       items: storeItems,
       selectionMode,
       listRef,
@@ -760,6 +770,13 @@ export function AriaCombobox<Value = any, Mode extends SelectionMode = 'none', I
 
       if (eventDetails.isCanceled) {
         return;
+      }
+
+      // Recorded after cancellation so a cancelled request leaves nothing behind. Settled by the
+      // synchronization effect below, which is the only place that can see whether `open` moved.
+      pendingCloseReasonRef.current = nextOpen ? null : eventDetails.reason;
+      if (openProp !== undefined) {
+        setControlledRequestVersion((version) => version + 1);
       }
 
       if (nextOpen && closeQuery !== null) {
@@ -1426,10 +1443,19 @@ export function AriaCombobox<Value = any, Mode extends SelectionMode = 'none', I
   });
 
   useIsoLayoutEffect(() => {
+    // Settle the request that may have asked for this value. The popup being open means any
+    // pending request was declined or superseded; the popup being closed with a request in flight
+    // means that request is the one that committed. A close with nothing in flight moved the state
+    // directly and carries no reason.
+    const pendingCloseReason = pendingCloseReasonRef.current;
+    pendingCloseReasonRef.current = null;
+    const closeReason = open ? null : pendingCloseReason;
+
     store.update({
       id,
       selectedValue,
       open,
+      closeReason,
       mounted,
       transitionStatus,
       items: storeItems,
@@ -1462,6 +1488,7 @@ export function AriaCombobox<Value = any, Mode extends SelectionMode = 'none', I
     id,
     selectedValue,
     open,
+    controlledRequestVersion,
     mounted,
     transitionStatus,
     storeItems,

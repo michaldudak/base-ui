@@ -19,6 +19,14 @@ export type State = {
   mounted: boolean;
   transitionStatus: TransitionStatus;
   forceMounted: boolean;
+  /**
+   * The reason of the last close that actually committed, cleared whenever the popup is open.
+   *
+   * A close request can be declined by a controlled consumer, and the request event fires before
+   * that decision is visible, so the request's reason is not a safe record of how the popup
+   * closed. This is written alongside the effective `open` value it belongs to.
+   */
+  closeReason: AriaCombobox.ChangeEventReason | null;
 
   inline: boolean;
 
@@ -121,6 +129,7 @@ export const selectors = {
   open: (state: State) => state.open,
   mounted: (state: State) => state.mounted,
   forceMounted: (state: State) => state.forceMounted,
+  closeReason: (state: State) => state.closeReason,
 
   inline: (state: State) => state.inline,
 

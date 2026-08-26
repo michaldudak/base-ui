@@ -132,8 +132,10 @@ export const PopoverTrigger = fastComponentRef(function PopoverTrigger(
     },
   };
 
-  const { preFocusGuardRef, handlePreFocusGuardFocus, handleFocusTargetFocus } =
-    useTriggerFocusGuards(store, triggerElementRef);
+  const { handlePreFocusGuardFocus, handleFocusTargetFocus } = useTriggerFocusGuards(
+    store,
+    triggerElementRef,
+  );
 
   const state: PopoverTriggerState = {
     disabled,
@@ -171,11 +173,7 @@ export const PopoverTrigger = fastComponentRef(function PopoverTrigger(
   if (isMountedByThisTrigger && !focusManagerModal) {
     return (
       <React.Fragment>
-        <FocusGuard
-          ref={preFocusGuardRef}
-          tabIndex={isOpenedByThisTrigger ? 0 : -1}
-          onFocus={handlePreFocusGuardFocus}
-        />
+        <FocusGuard tabIndex={isOpenedByThisTrigger ? 0 : -1} onFocus={handlePreFocusGuardFocus} />
         {keyedElement}
         <FocusGuard
           ref={store.context.triggerFocusTargetRef}

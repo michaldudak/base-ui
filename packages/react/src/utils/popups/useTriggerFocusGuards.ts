@@ -1,5 +1,5 @@
 'use client';
-import * as React from 'react';
+import type * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { ownerDocument } from '@base-ui/utils/owner';
 import {
@@ -48,8 +48,6 @@ export function useTriggerFocusGuards(
   store: TriggerFocusGuardStore,
   triggerElementRef: React.RefObject<HTMLElement | null>,
 ) {
-  const preFocusGuardRef = React.useRef<HTMLElement>(null);
-
   function collectDestinations(
     snapshot: TabOrderSnapshot,
     anchor: Element | null,
@@ -239,5 +237,5 @@ export function useTriggerFocusGuards(
     );
   }
 
-  return { preFocusGuardRef, handlePreFocusGuardFocus, handleFocusTargetFocus };
+  return { handlePreFocusGuardFocus, handleFocusTargetFocus };
 }

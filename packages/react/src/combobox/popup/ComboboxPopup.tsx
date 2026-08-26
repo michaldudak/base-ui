@@ -20,7 +20,6 @@ import { StateAttributesMapping } from '../../internals/getStateAttributesProps'
 import { activeElement, contains, getTarget } from '../../floating-ui-react/utils';
 import { getDisabledMountTransitionStyles } from '../../internals/getDisabledMountTransitionStyles';
 import { REASONS } from '../../internals/reasons';
-import type { FloatingUIOpenChangeDetails } from '../../internals/types';
 import { ComboboxInternalDismissButton } from '../utils/ComboboxInternalDismissButton';
 import { getComboboxPopupId } from '../root/utils';
 import { useListEmpty } from '../utils/parts';
@@ -120,32 +119,14 @@ export const ComboboxPopup = React.forwardRef(function ComboboxPopup(
   const resolvedInitialFocus =
     initialFocus === undefined ? computedDefaultInitialFocus : initialFocus;
 
-  const closedByOutsidePressRef = React.useRef(false);
-  useIsoLayoutEffect(() => {
-    if (open) {
-      closedByOutsidePressRef.current = false;
-    }
-  }, [open]);
-
-  useIsoLayoutEffect(() => {
-    const events = floatingRootContext.context.events;
-
-    function onOpenChange(details: FloatingUIOpenChangeDetails) {
-      if (!details.open) {
-        closedByOutsidePressRef.current = details.reason === REASONS.outsidePress;
-      }
-    }
-
-    events.on('openchange', onOpenChange);
-    return () => {
-      events.off('openchange', onOpenChange);
-    };
-  }, [floatingRootContext]);
-
+  // Making the closing popup inert blurs whatever it held, so a control inside it that had focus
+  // would otherwise strand it on `<body>`. An outside press is the user moving focus themselves,
+  // and the store records the reason of the close that actually committed rather than the reason
+  // of a request a controlled consumer may have declined.
   const returnFocusToExternalInput = useStableCallback(() => {
     const positionerElement = store.state.positionerElement;
     if (
-      !closedByOutsidePressRef.current &&
+      store.state.closeReason !== REASONS.outsidePress &&
       positionerElement &&
       contains(positionerElement, activeElement(ownerDocument(positionerElement)))
     ) {

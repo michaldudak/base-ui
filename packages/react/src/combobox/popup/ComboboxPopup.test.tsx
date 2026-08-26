@@ -248,6 +248,77 @@ describe('<Combobox.Popup />', () => {
       expect(document.body).toHaveFocus();
     });
 
+    it('hands focus back on a close that follows a declined outside press', async ({
+      onTestFinished,
+    }) => {
+      globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
+      onTestFinished(() => {
+        globalThis.BASE_UI_ANIMATIONS_DISABLED = true;
+      });
+
+      function Test() {
+        const [open, setOpen] = React.useState(true);
+        return (
+          <React.Fragment>
+            {/* eslint-disable-next-line react/no-danger */}
+            <style dangerouslySetInnerHTML={{ __html: style }} />
+            <p data-testid="plain">Not focusable</p>
+            <button type="button" data-testid="close-externally" onClick={() => setOpen(false)}>
+              Close
+            </button>
+            <Combobox.Root
+              items={['a', 'b']}
+              open={open}
+              onOpenChange={(nextOpen) => {
+                // Accepts opens, declines every close request.
+                if (nextOpen) {
+                  setOpen(true);
+                }
+              }}
+            >
+              <Combobox.Input data-testid="input" />
+              <Combobox.Portal>
+                <Combobox.Positioner>
+                  <Combobox.Popup data-testid="popup" className="animation-test-popup">
+                    <Combobox.List>
+                      {(item: string) => (
+                        <Combobox.Item key={item} value={item}>
+                          {item}
+                        </Combobox.Item>
+                      )}
+                    </Combobox.List>
+                    <button type="button" data-testid="inside">
+                      Create new
+                    </button>
+                  </Combobox.Popup>
+                </Combobox.Positioner>
+              </Combobox.Portal>
+            </Combobox.Root>
+          </React.Fragment>
+        );
+      }
+
+      const { user } = await render(<Test />);
+      const inside = await screen.findByTestId('inside');
+      inside.focus();
+      expect(inside).toHaveFocus();
+
+      // The consumer declines this dismissal, so the popup stays open and the request's reason
+      // must not outlive it.
+      await user.click(screen.getByTestId('plain'));
+      expect(screen.getByTestId('popup')).not.toHaveAttribute('data-ending-style');
+
+      inside.focus();
+      expect(inside).toHaveFocus();
+
+      // A programmatic close carries no reason of its own. Reusing the declined outside press's
+      // reason would skip the handoff and let `inert` drop focus to `<body>`.
+      fireEvent.click(screen.getByTestId('close-externally'));
+
+      expect(screen.getByTestId('popup')).toHaveAttribute('data-ending-style');
+      await waitFor(() => expect(screen.getByTestId('input')).toHaveFocus());
+    });
+
     it('starts each close with fresh return-focus state while the popup stays mounted', async ({
       onTestFinished,
     }) => {

@@ -209,8 +209,10 @@ export const MenuTrigger = fastComponentRef(function MenuTrigger(
 
   const rootTriggerProps = store.useState('triggerProps', isMountedByThisTrigger);
 
-  const { preFocusGuardRef, handlePreFocusGuardFocus, handleFocusTargetFocus } =
-    useTriggerFocusGuards(store, triggerElementRef);
+  const { handlePreFocusGuardFocus, handleFocusTargetFocus } = useTriggerFocusGuards(
+    store,
+    triggerElementRef,
+  );
 
   const state: MenuTriggerState = {
     disabled,
@@ -275,11 +277,7 @@ export const MenuTrigger = fastComponentRef(function MenuTrigger(
   if (isOpenedByThisTrigger) {
     return (
       <React.Fragment>
-        <FocusGuard
-          ref={preFocusGuardRef}
-          onFocus={handlePreFocusGuardFocus}
-          key={`${thisTriggerId}-pre-focus-guard`}
-        />
+        <FocusGuard onFocus={handlePreFocusGuardFocus} key={`${thisTriggerId}-pre-focus-guard`} />
         <React.Fragment key={thisTriggerId}>{element}</React.Fragment>
         <FocusGuard
           ref={store.context.triggerFocusTargetRef}

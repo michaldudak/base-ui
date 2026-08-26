@@ -94,6 +94,89 @@ describe('<Popover.Root />', () => {
     });
 
     describe('controlled open', () => {
+      it('does not let an ignored request classify a later programmatic open', async () => {
+        function App() {
+          const [open, setOpen] = React.useState(false);
+
+          return (
+            <React.Fragment>
+              <button type="button" data-testid="open-externally" onClick={() => setOpen(true)}>
+                Open
+              </button>
+              <Popover.Root
+                open={open}
+                onOpenChange={() => {
+                  // Deliberately ignores every request without cancelling it, which is what a
+                  // consumer filtering interactions through its own state looks like.
+                }}
+              >
+                <Popover.Trigger openOnHover delay={0} data-testid="trigger">
+                  Trigger
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Positioner>
+                    <Popover.Popup>
+                      <button type="button" data-testid="inside">
+                        Inside
+                      </button>
+                    </Popover.Popup>
+                  </Popover.Positioner>
+                </Popover.Portal>
+              </Popover.Root>
+            </React.Fragment>
+          );
+        }
+
+        const { user } = await render(<App />);
+
+        await user.hover(screen.getByTestId('trigger'));
+        expect(screen.queryByTestId('inside')).toBe(null);
+
+        // Dispatched without moving the pointer: a real click elsewhere would fire a hover-close
+        // on the way, and that second request would mask the stale classification.
+        fireEvent.click(screen.getByTestId('open-externally'));
+
+        // A programmatic open carries no interaction reason, so the focus manager takes initial
+        // focus. Reusing the ignored hover request's reason would classify this as a hover session
+        // and leave focus behind on the button that opened it.
+        await waitFor(() => expect(screen.getByTestId('inside')).toHaveFocus());
+      });
+
+      it('does not let an ignored close request stamp the transition style', async () => {
+        function App() {
+          const [open, setOpen] = React.useState(true);
+
+          return (
+            <Popover.Root
+              open={open}
+              onOpenChange={(nextOpen) => {
+                // Accepts opens, ignores every close request.
+                if (nextOpen) {
+                  setOpen(true);
+                }
+              }}
+            >
+              <Popover.Trigger data-testid="trigger">Trigger</Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Positioner>
+                  <Popover.Popup data-testid="popup">Content</Popover.Popup>
+                </Popover.Positioner>
+              </Popover.Portal>
+            </Popover.Root>
+          );
+        }
+
+        const { user } = await render(<App />);
+        expect(screen.getByTestId('popup')).not.toHaveAttribute('data-instant');
+
+        // The consumer declines this dismissal, so nothing it would have committed may survive —
+        // including the transition style, which would otherwise cancel the next animation.
+        await user.keyboard('{Escape}');
+        await flushMicrotasks();
+
+        expect(screen.getByTestId('popup')).not.toHaveAttribute('data-instant');
+      });
+
       it('should call onChange when the open state changes', async () => {
         const handleChange = vi.fn();
 
