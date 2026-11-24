@@ -158,9 +158,9 @@ export interface PopupInteractionStore {
 export interface PositioningInteractionStore extends PopupInteractionStore {
   /**
    * Forgets the elements positioning reads while the popup isn't mounted, so positioning doesn't
-   * run for a `keepMounted` popup that is closed.
+   * run for a `keepMounted` popup that is closed. Lasts while the current owner lives.
    */
-  clearPositioning(): void;
+  useClearedPositioning(mounted: () => boolean): void;
 }
 
 export type PopupPositioningContext = Omit<UsePositionFloatingReturn, 'refs' | 'elements'> & {

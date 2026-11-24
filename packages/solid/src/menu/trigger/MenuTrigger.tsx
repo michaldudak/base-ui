@@ -117,7 +117,6 @@ function MenuTriggerImpl<Payload>(
 
   const { registerTrigger, isMountedByThisTrigger } = useTriggerDataForwarding(
     thisTriggerId,
-    triggerElementRef,
     store,
     () => ({
       payload: componentProps.payload,
@@ -466,6 +465,10 @@ function useStickIfOpen(open: () => boolean, getOpenReason: () => string | null)
   return stickIfOpen;
 }
 
+// One object for every trigger without a parent, so that a menu moving between such triggers
+// keeps the same `parent` value.
+const NO_PARENT: MenuParent = { type: undefined };
+
 function useMenuParent(): MenuParent {
   const menubarContext = useMenubarContext(true);
 
@@ -476,7 +479,5 @@ function useMenuParent(): MenuParent {
     };
   }
 
-  return {
-    type: undefined,
-  };
+  return NO_PARENT;
 }

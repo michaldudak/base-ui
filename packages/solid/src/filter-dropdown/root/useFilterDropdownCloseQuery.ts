@@ -1,6 +1,6 @@
-import { createSignal, onCleanup } from 'solid-js';
+import { createMemo, onCleanup, untrack } from 'solid-js';
 import type { Accessor } from 'solid-js';
-import { useIsoLayoutEffect } from '#utils/useEffect';
+import { useExternalEffect, useIsoLayoutEffect } from '#utils/useEffect';
 import type { MaybeAccessor } from '#utils/access';
 import { access } from '#utils/access';
 import { createChangeEventDetails } from '../../internals/createBaseUIEventDetails';
@@ -23,61 +23,70 @@ interface UseFilterDropdownCloseQueryParameters {
 export function useFilterDropdownCloseQuery(
   parameters: UseFilterDropdownCloseQueryParameters,
 ): Accessor<string> {
-  const [closeQuery, setCloseQuery] = createSignal<string | null>(null, { ownedWrite: true });
+  const open = () => access(parameters.open);
+  const mounted = () => access(parameters.mounted);
+  const value = () => access(parameters.value);
 
-  // Solid port: the latest committed values, read where React read the latest render's values
-  // (the stable callback below and the unmount cleanup), which can't read accessors.
+  // The query the popup closed with, while it is closed and still mounted. It is derived state:
+  // the memo captures the value in the pass where the popup closes, keeps it while the popup
+  // animates out, and lets go once the popup has unmounted or opened again. (React keeps it in
+  // state that an effect sets and clears.)
+  const closeState = createMemo<{ open: boolean; query: string | null }>((previous) => {
+    const isOpen = open();
+    if (isOpen || !mounted()) {
+      return { open: isOpen, query: null };
+    }
+    if (previous?.open) {
+      // Captured once, on closing; a later change of the value doesn't replace it.
+      const closingValue = untrack(value);
+      return { open: false, query: closingValue !== '' ? closingValue : null };
+    }
+    return previous ?? { open: false, query: null };
+  });
+
+  // The value the unmount cleanup reads, which can't read accessors.
   const latest = { value: '' };
-  let initialized = false;
+  useIsoLayoutEffect(
+    () => [value()] as const,
+    ([currentValue]) => {
+      latest.value = currentValue;
+    },
+  );
 
-  const previousOpenRef = { current: false };
-  const pendingResetRef = { current: false };
+  let pendingReset = false;
 
-  const settlePendingReset = () => {
-    pendingResetRef.current = false;
-    if (latest.value !== '') {
+  const settlePendingReset = (currentValue: string) => {
+    pendingReset = false;
+    if (currentValue !== '') {
       parameters.onValueChange('', createChangeEventDetails(REASONS.popupClose));
     }
   };
 
-  useIsoLayoutEffect(
-    () =>
-      [
-        access(parameters.open),
-        access(parameters.mounted),
-        access(parameters.value),
-        closeQuery(),
-      ] as const,
-    ([open, mounted, value, currentCloseQuery]) => {
-      latest.value = value;
-      if (!initialized) {
-        // `useRef(open)`: the first run compares against the initial value.
-        initialized = true;
-        previousOpenRef.current = open;
+  // Clears the committed value once the popup has unmounted, which follows its exit animation.
+  // `value` is read when the effect runs, without being a dependency: the effect resets it.
+  useExternalEffect(
+    () => [open(), mounted(), untrack(value)] as const,
+    ([isOpen, isMounted, currentValue], previous) => {
+      // `useRef(open)`: the first run compares against the initial value.
+      const wasOpen = previous ? previous[0] : isOpen;
+      if (wasOpen && !isOpen && currentValue !== '') {
+        pendingReset = true;
       }
-      const wasOpen = previousOpenRef.current;
-      previousOpenRef.current = open;
-      if (wasOpen && !open && value !== '') {
-        pendingResetRef.current = true;
-        setCloseQuery(value);
-      } else if ((open || !mounted) && currentCloseQuery !== null) {
-        // A reopen that interrupts the exit never unmounts, so it settles the pending reset too.
-        setCloseQuery(null);
-        settlePendingReset();
+      // A reopen that interrupts the exit never unmounts, so it settles the pending reset too.
+      if ((isOpen || !isMounted) && pendingReset) {
+        settlePendingReset(currentValue);
       }
     },
   );
 
   onCleanup(() => {
-    if (pendingResetRef.current) {
-      settlePendingReset();
+    if (pendingReset) {
+      settlePendingReset(latest.value);
     }
   });
 
   return () => {
-    const currentCloseQuery = closeQuery();
-    return !access(parameters.open) && currentCloseQuery !== null
-      ? currentCloseQuery
-      : access(parameters.value);
+    const closeQuery = closeState().query;
+    return !open() && closeQuery !== null ? closeQuery : value();
   };
 }

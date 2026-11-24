@@ -71,7 +71,7 @@ export function useVirtualFocusParentHandoff(
         // A parent closing in the same commit, such as on an item press, syncs its controlled `open`
         // in its own layout effect, which runs after this one. An unmount can clear the trigger by
         // then, so read it now.
-        const trigger = store.state.activeTriggerElement ?? openTriggerElement;
+        const trigger = store.select('lastActiveTriggerElement') ?? openTriggerElement;
         openTriggerElement = null;
         const reason = store.select('lastOpenChangeReason');
         queueMicrotask(() => returnToParent(trigger, reason, isVirtualFocus));

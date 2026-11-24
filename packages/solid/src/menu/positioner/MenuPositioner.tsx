@@ -2,7 +2,7 @@ import { createMemo, Show } from 'solid-js';
 import type { JSX } from '@solidjs/web';
 import { inertValue } from '#utils/inertValue';
 import { useTimeout } from '#utils/useTimeout';
-import { useEffect } from '#utils/useEffect';
+import { useEffect, useExternalEffect } from '#utils/useEffect';
 import { FloatingNode } from '../../utils/popups/tree/FloatingTree';
 import { MenuPositionerContext } from './MenuPositionerContext';
 import { useMenuRootContext } from '../root/MenuRootContext';
@@ -151,9 +151,13 @@ export function MenuPositioner(componentProps: MenuPositioner.Props): JSX.Elemen
   const { positioning: positioner, open, mounted } = popupPositioner;
 
   useEffect(
-    () => [floatingTreeRoot(), floatingNodeId()] as const,
-    ([currentFloatingTreeRoot, currentFloatingNodeId]) => {
+    () => [floatingTreeRoot()] as const,
+    ([currentFloatingTreeRoot]) => {
       function onMenuOpenChange(details: MenuOpenEventDetails) {
+        // Solid port: read when the event arrives. The node id changes along with `open` (the
+        // menu takes its trigger's id), and the effect that emits this event can run before this
+        // one has seen the new id.
+        const currentFloatingNodeId = store.select('floatingNodeId');
         if (details.open) {
           if (details.parentNodeId === currentFloatingNodeId) {
             store.set('hoverEnabled', false);
@@ -250,7 +254,9 @@ export function MenuPositioner(componentProps: MenuPositioner.Props): JSX.Elemen
     },
   );
 
-  useEffect(
+  // Publishes the open state to the tree's event bus. The other menus of the tree react to the
+  // event (a parent stops opening on hover, an open sibling closes).
+  useExternalEffect(
     () => [floatingTreeRoot(), open(), floatingNodeId(), floatingParentNodeId()] as const,
     ([currentFloatingTreeRoot, isOpen, currentFloatingNodeId, currentFloatingParentNodeId]) => {
       const eventDetails: MenuOpenEventDetails = {

@@ -14,5 +14,6 @@ reason:
 
 Skips fall into three groups: tests that need a component outside the proof of concept (Dialog,
 AlertDialog, Popover, Menubar, ContextMenu, Toolbar, ScrollArea, `Menu.Viewport`), a router or
-server rendering; React-only tests (Strict Mode, React 17); and seven tests with no Solid
-equivalent, described under "Skipped: no Solid equivalent" in `filter-root.md`.
+server rendering; React-only tests (Strict Mode, React 17); and nine tests with no Solid
+equivalent: seven described under "Skipped: no Solid equivalent" in `filter-root.md`, and two
+under "Native Solid state redesign" in `core-fixes.md`.

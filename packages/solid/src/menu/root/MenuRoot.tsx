@@ -2,7 +2,8 @@ import { createMemo, createSignal, Show, untrack, useContext } from 'solid-js';
 import type { Accessor } from 'solid-js';
 import type { JSX } from '@solidjs/web';
 import { useTimeout } from '#utils/useTimeout';
-import { useEffect, useIsoLayoutEffect, useOnMount } from '#utils/useEffect';
+import { KEEP } from '#utils/store';
+import { useEffect, useIsoLayoutEffect, useOnMount, useExternalEffect } from '#utils/useEffect';
 import { EMPTY_ARRAY, EMPTY_OBJECT } from '#utils/empty';
 import {
   FloatingTree,
@@ -31,9 +32,13 @@ import { mergeProps } from '../../merge-props/mergeProps';
 import { useAnimationsFinished } from '../../internals/useAnimationsFinished';
 import { MenuStore } from '../store/MenuStore';
 import type { MenuHandle } from '../store/MenuHandle';
-import type { MenuCommittedOpenState } from '../store/MenuStore';
+import type { MenuCommittedOpenState, MenuTriggerData } from '../store/MenuStore';
 import type { PayloadChildRenderFunction } from '../../utils/popups/popupRoot';
-import { usePopupRootWithPopupId, renderPopupRootChildren } from '../../utils/popups/popupRoot';
+import {
+  usePopupRootWithPopupId,
+  renderPopupRootChildren,
+  useActiveTriggerData,
+} from '../../utils/popups/popupRoot';
 import {
   FOCUSABLE_POPUP_PROPS,
   usePopupInteractionProps,
@@ -203,10 +208,22 @@ export function MenuRootInternal<Payload>(props: MenuRootInternalProps<Payload>)
   // bypasses `setOpen`, so nothing would reset it and `[data-instant]` would wrongly suppress
   // every subsequent transition. Clear it once the enter phase settles, unless an interactive
   // open change already replaced it.
-  useEffect(
+  // A controlled close can interrupt the initial enter before the animations-finished callback
+  // below fires (its abort cancels the pending callback, and a closed popup schedules no new
+  // one). Nothing is left to protect once closing starts — the exit's suppression was already
+  // decided at its trigger commit — so the seeded value does not outlive the open state, or the
+  // next reopen would render a stale `[data-instant]`.
+  if (seededInstantType !== undefined) {
+    store.useDerivedValue('instantType', (instantType) =>
+      !open() && instantType === seededInstantType ? undefined : KEEP,
+    );
+  }
+
+  // Waits for the popup's animations, which are outside the reactive graph.
+  useExternalEffect(
     () => [open(), transitionStatus()] as const,
     ([isOpen, currentTransitionStatus]) => {
-      if (seededInstantType === undefined) {
+      if (seededInstantType === undefined || !isOpen) {
         return undefined;
       }
 
@@ -215,16 +232,6 @@ export function MenuRootInternal<Payload>(props: MenuRootInternalProps<Payload>)
           store.set('instantType', undefined);
         }
       };
-
-      // A controlled close can interrupt the initial enter before the animations-finished cleanup
-      // below fires (its abort cancels the pending callback, and a closed popup schedules no new
-      // one). Nothing is left to protect once closing starts — the exit's suppression was already
-      // decided at its trigger commit — so clear now or the next reopen renders a stale
-      // `[data-instant]`.
-      if (!isOpen) {
-        clearSeededInstantType();
-        return undefined;
-      }
 
       if (currentTransitionStatus !== undefined) {
         return undefined;
@@ -248,30 +255,46 @@ export function MenuRootInternal<Payload>(props: MenuRootInternalProps<Payload>)
     },
   );
 
-  useIsoLayoutEffect(
-    () => [floatingParentNodeIdFromContext(), activeTriggerElement()] as const,
-    ([currentFloatingParentNodeIdFromContext]) => {
-      if (contextMenuContext && !parentMenuRootContext) {
-        // This is a context menu root.
-        // It doesn't support detached triggers yet, so we have to sync the parent context manually.
-        store.update({
-          parent: {
-            type: 'context-menu',
-            context: contextMenuContext,
-          },
-          floatingNodeId: floatingNodeIdFromContext,
-          floatingParentNodeId: currentFloatingParentNodeIdFromContext,
-        });
-      } else if (parentMenuRootContext || !store.select('activeTriggerElement')) {
-        // Without an active trigger, the root must supply its own tree IDs.
-        // Read the store here: a trigger can register after render, before this effect.
-        store.update({
-          floatingNodeId: floatingNodeIdFromContext,
-          floatingParentNodeId: currentFloatingParentNodeIdFromContext,
-        });
-      }
-    },
-  );
+  // What the menu takes from the trigger it is open from. `Menu.Trigger` registers these along
+  // with its element; here they are derived from the active trigger, so they change in the same
+  // pass as the active trigger does. While no trigger is active the store keeps the last values,
+  // and they can still be written (a handle's `openWithPayload()` sets the payload).
+  const triggerData = useActiveTriggerData<MenuTriggerData<Payload>>(store);
+
+  function fromTrigger<Key extends keyof MenuTriggerData<Payload>>(key: Key) {
+    return () => {
+      const data = triggerData();
+      return data ? data[key] : KEEP;
+    };
+  }
+
+  store.useDerivedValue('payload', fromTrigger('payload'));
+  store.useDerivedValue('floatingTreeRoot', fromTrigger('floatingTreeRoot'));
+  store.useDerivedValue('keyboardEventRelay', fromTrigger('keyboardEventRelay'));
+  if (!parentMenuRootContext) {
+    // A submenu's close delay comes from its `Menu.SubmenuTrigger`, which syncs it itself.
+    store.useDerivedValue('closeDelay', fromTrigger('closeDelay'));
+  }
+
+  if (contextMenuContext && !parentMenuRootContext) {
+    // This is a context menu root.
+    // It doesn't support detached triggers yet, so it supplies the parent and the tree IDs itself.
+    store.useSyncedValues(() => ({
+      parent: { type: 'context-menu' as const, context: contextMenuContext },
+      floatingNodeId: floatingNodeIdFromContext,
+      floatingParentNodeId: floatingParentNodeIdFromContext(),
+    }));
+  } else {
+    store.useDerivedValue('parent', fromTrigger('parent'));
+    // Without an active trigger, and in a submenu, the root supplies its own tree IDs.
+    const usesOwnTreeIds = () => parentMenuRootContext != null || !activeTriggerElement();
+    store.useDerivedValue('floatingNodeId', () =>
+      usesOwnTreeIds() ? floatingNodeIdFromContext : fromTrigger('floatingNodeId')(),
+    );
+    store.useDerivedValue('floatingParentNodeId', () =>
+      usesOwnTreeIds() ? floatingParentNodeIdFromContext() : fromTrigger('floatingParentNodeId')(),
+    );
+  }
 
   useEffect(
     () => [open(), parent().type] as const,
@@ -301,19 +324,11 @@ export function MenuRootInternal<Payload>(props: MenuRootInternalProps<Payload>)
 
   useOnMount(() => store.context.allowTouchToCloseTimeout.disposeEffect());
 
-  useIsoLayoutEffect(
-    () => [open(), hoverEnabled()] as const,
-    ([isOpen, isHoverEnabled]) => {
-      if (!isOpen && !isHoverEnabled) {
-        store.set('hoverEnabled', true);
-      }
-    },
-  );
-
-  useIsoLayoutEffect(
-    () => [],
-    () => store.subscribeToParentMenu(),
-  );
+  // State that starts over when the menu closes. These are writable derived values: they can be
+  // written while the menu is open, and closing the menu resets them. (In React, effects reset
+  // them after the menu has rendered as closed.)
+  store.useDerivedValue('hoverEnabled', () => (open() ? KEEP : true));
+  store.useDerivedValue('activeIndex', () => (open() ? KEEP : null));
 
   const lastOpenChangeReason = store.useState('lastOpenChangeReason');
   // Repeated open requests are compared against what this Root last committed.
@@ -526,7 +541,9 @@ export function MenuRootInternal<Payload>(props: MenuRootInternalProps<Payload>)
     );
   };
 
-  useIsoLayoutEffect(
+  // The highlighted element is looked up in the item registry, which lives outside the reactive
+  // graph, so it is reported from an effect.
+  useExternalEffect(
     () => [activeIndex()] as const,
     () => {
       syncHighlightedItem();

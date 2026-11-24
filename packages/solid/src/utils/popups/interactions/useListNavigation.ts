@@ -1,7 +1,7 @@
 import { createMemo, untrack } from 'solid-js';
 import type { Accessor } from 'solid-js';
 import { useAnimationFrame } from '#utils/useAnimationFrame';
-import { useEffect, useIsoLayoutEffect } from '#utils/useEffect';
+import { useEffect, useIsoLayoutEffect, useExternalEffect } from '#utils/useEffect';
 import { ownerDocument } from '#utils/owner';
 import { platform } from '#utils/platform';
 import { activeElement, contains, getTarget } from '#utils/shadowDom';
@@ -330,8 +330,6 @@ export function useListNavigation(
     onNavigateProp(indexRef.current === -1 ? null : indexRef.current, event);
   };
 
-  const previousMountedRef = { current: untrack(() => !!positionerElement()) };
-  const previousOpenRef = { current: untrack(open) };
   const forceSyncFocusRef = { current: false };
   const forceScrollIntoViewRef = { current: false };
   const cancelQueuedFocusRef: { current: (() => void) | null } = { current: null };
@@ -421,10 +419,14 @@ export function useListNavigation(
   // element. Also, reset `activeIndex` upon closing the floating element.
   useIsoLayoutEffect(
     () => [enabled(), open(), positionerElement(), selectedIndex()] as const,
-    ([isEnabled, isOpen, currentPositionerElement, currentSelectedIndex]) => {
+    ([isEnabled, isOpen, currentPositionerElement, currentSelectedIndex], previous) => {
       if (!isEnabled) {
         return;
       }
+      // Solid port: React keeps "was it mounted after the last render" in a ref that a last
+      // effect updates. Effects don't run in declaration order here, so each effect takes the
+      // previous values of its own dependencies instead.
+      const wasMounted = previous ? !!previous[2] : !!currentPositionerElement;
 
       if (isOpen && currentPositionerElement) {
         indexRef.current = currentSelectedIndex ?? -1;
@@ -434,11 +436,97 @@ export function useListNavigation(
           forceScrollIntoViewRef.current = true;
           onNavigate();
         }
-      } else if (previousMountedRef.current) {
+      } else if (wasMounted) {
         // Reset the active index when the list is no longer open and mounted (closing or
         // unmounting). `onNavigate` always forwards to the latest `onNavigate` prop.
         indexRef.current = -1;
         onNavigate();
+      }
+    },
+  );
+
+  // Highlight an item when the floating element opens from the keyboard.
+  // Solid port: in React this is part of the effect below. It is its own effect here because it
+  // writes `activeIndex` (through `onNavigate`), and an effect must not depend on what it writes.
+  // Which item to highlight depends on the items the list has rendered, so this reports from the
+  // DOM rather than deriving a value.
+  useExternalEffect(
+    () =>
+      [
+        enabled(),
+        open(),
+        positionerElement(),
+        nested(),
+        triggerOrientation(),
+        rtl(),
+        // Read when the effect runs, without re-running it.
+        untrack(activeIndex),
+        untrack(selectedIndex),
+      ] as const,
+    (
+      [
+        isEnabled,
+        isOpen,
+        currentPositionerElement,
+        isNested,
+        currentTriggerOrientation,
+        isRtl,
+        currentActiveIndex,
+        currentSelectedIndex,
+      ],
+      previous,
+    ) => {
+      if (
+        !isEnabled ||
+        !isOpen ||
+        !currentPositionerElement ||
+        currentActiveIndex != null ||
+        currentSelectedIndex != null
+      ) {
+        return;
+      }
+      const wasOpen = previous ? previous[1] : isOpen;
+      const wasMounted = previous ? !!previous[2] : !!currentPositionerElement;
+
+      // Initial sync.
+      if (
+        (!wasOpen || !wasMounted) &&
+        focusItemOnOpenRef.current &&
+        (keyRef.current != null || (focusItemOnOpenRef.current === true && keyRef.current == null))
+      ) {
+        let runs = 0;
+        const waitForListPopulated = () => {
+          if (listRef.current[0] == null) {
+            // Avoid letting the browser paint if possible on the first try,
+            // otherwise use rAF. Don't try more than twice, since something
+            // is wrong otherwise.
+            // Solid port: the list resolves its items from its own effect, which runs after
+            // this one (a parent's effects run first), so the first retry usually finds them.
+            if (runs < 2) {
+              const scheduler = runs
+                ? (callback: () => void) => waitForListPopulatedFrame.request(callback)
+                : queueMicrotask;
+              scheduler(waitForListPopulated);
+            }
+            runs += 1;
+          } else {
+            // Initially focus the first non-disabled item. `disabledIndices` is deliberately
+            // omitted here so attribute-disabled items (`disabled`/`aria-disabled`) are skipped
+            // on open even when the consumer passes an empty `disabledIndices` array. Passing it
+            // would regress that behavior (see mui/base-ui#2604).
+            // The key came from the trigger, so it is read on the trigger's orientation.
+            indexRef.current =
+              keyRef.current == null ||
+              isMainOrientationToEndKey(keyRef.current, currentTriggerOrientation, isRtl) ||
+              isNested
+                ? getMinListIndex(listRef)
+                : getMaxListIndex(listRef);
+            keyRef.current = null;
+            onNavigate();
+          }
+        };
+
+        waitForListPopulated();
       }
     },
   );
@@ -452,28 +540,26 @@ export function useListNavigation(
         open(),
         positionerElement(),
         activeIndex(),
-        nested(),
-        triggerOrientation(),
-        rtl(),
         // Read when the effect runs, without re-running it (React read them from refs or a
         // stable callback).
         untrack(selectedIndex),
         untrack(virtual),
       ] as const,
-    ([
-      isEnabled,
-      isOpen,
-      currentPositionerElement,
-      currentActiveIndex,
-      isNested,
-      currentTriggerOrientation,
-      isRtl,
-      currentSelectedIndex,
-      isVirtual,
-    ]) => {
+    (
+      [
+        isEnabled,
+        isOpen,
+        currentPositionerElement,
+        currentActiveIndex,
+        currentSelectedIndex,
+        isVirtual,
+      ],
+      previous,
+    ) => {
       if (!isEnabled) {
         return;
       }
+      const wasMounted = previous ? !!previous[2] : !!currentPositionerElement;
       if (!isOpen) {
         forceSyncFocusRef.current = false;
         return;
@@ -490,51 +576,9 @@ export function useListNavigation(
         }
 
         // Reset while the floating element was open (e.g. the list changed).
-        if (previousMountedRef.current) {
+        if (wasMounted) {
           indexRef.current = -1;
           focusItem(isVirtual);
-        }
-
-        // Initial sync.
-        if (
-          (!previousOpenRef.current || !previousMountedRef.current) &&
-          focusItemOnOpenRef.current &&
-          (keyRef.current != null ||
-            (focusItemOnOpenRef.current === true && keyRef.current == null))
-        ) {
-          let runs = 0;
-          const waitForListPopulated = () => {
-            if (listRef.current[0] == null) {
-              // Avoid letting the browser paint if possible on the first try,
-              // otherwise use rAF. Don't try more than twice, since something
-              // is wrong otherwise.
-              // Solid port: the list resolves its items from its own effect, which runs after
-              // this one (a parent's effects run first), so the first retry usually finds them.
-              if (runs < 2) {
-                const scheduler = runs
-                  ? (callback: () => void) => waitForListPopulatedFrame.request(callback)
-                  : queueMicrotask;
-                scheduler(waitForListPopulated);
-              }
-              runs += 1;
-            } else {
-              // Initially focus the first non-disabled item. `disabledIndices` is deliberately
-              // omitted here so attribute-disabled items (`disabled`/`aria-disabled`) are skipped
-              // on open even when the consumer passes an empty `disabledIndices` array. Passing it
-              // would regress that behavior (see mui/base-ui#2604).
-              // The key came from the trigger, so it is read on the trigger's orientation.
-              indexRef.current =
-                keyRef.current == null ||
-                isMainOrientationToEndKey(keyRef.current, currentTriggerOrientation, isRtl) ||
-                isNested
-                  ? getMinListIndex(listRef)
-                  : getMaxListIndex(listRef);
-              keyRef.current = null;
-              onNavigate();
-            }
-          };
-
-          waitForListPopulated();
         }
       } else if (!isIndexOutOfListBounds(listRef.current, currentActiveIndex)) {
         indexRef.current = currentActiveIndex;
@@ -548,14 +592,11 @@ export function useListNavigation(
   // to allow arrow key navigation to work after the pointer leaves the child.
   useIsoLayoutEffect(
     () => [enabled(), positionerElement(), anchorElement(), access(parentId), virtual()] as const,
-    ([isEnabled, currentPositionerElement, currentAnchorElement, currentParentId, isVirtual]) => {
-      if (
-        !isEnabled ||
-        currentPositionerElement ||
-        !tree ||
-        isVirtual ||
-        !previousMountedRef.current
-      ) {
+    (
+      [isEnabled, currentPositionerElement, currentAnchorElement, currentParentId, isVirtual],
+      previous,
+    ) => {
+      if (!isEnabled || currentPositionerElement || !tree || isVirtual || !previous?.[1]) {
         return;
       }
 
@@ -572,17 +613,6 @@ export function useListNavigation(
       if (parent && !treeContainsActiveEl && isPointerModalityRef.current) {
         parent.focus({ preventScroll: true });
       }
-    },
-  );
-
-  // React updates these after every render. Their values only depend on `open` and
-  // `positionerElement`, so the effect re-runs when those change; it is declared after the
-  // effects above so it runs after them, like in React.
-  useIsoLayoutEffect(
-    () => [open(), positionerElement()] as const,
-    ([isOpen, currentPositionerElement]) => {
-      previousOpenRef.current = isOpen;
-      previousMountedRef.current = !!currentPositionerElement;
     },
   );
 

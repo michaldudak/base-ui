@@ -1,7 +1,8 @@
 import { untrack } from 'solid-js';
 import { access } from '#utils/access';
 import type { MaybeAccessor } from '#utils/access';
-import { useIsoLayoutEffect } from '#utils/useEffect';
+import { useIsoLayoutEffect, useExternalEffect } from '#utils/useEffect';
+import { KEEP } from '#utils/store';
 import { useAnimationsFinished } from './useAnimationsFinished';
 
 /**
@@ -9,12 +10,11 @@ import { useAnimationsFinished } from './useAnimationsFinished';
  * this hook touches are typed.
  */
 interface TriggerSwitchStore {
-  /**
-   * Read raw, because the `instantType` selector deliberately hides
-   * `trigger-change` while closed — which is exactly when it has to be cleared.
-   */
-  readonly state: { readonly instantType: string | undefined };
   set(key: 'instantType', value: 'trigger-change' | undefined): void;
+  useDerivedValue(
+    key: 'instantType',
+    source: (previous: string | undefined) => undefined | typeof KEEP,
+  ): void;
   select(key: 'open'): boolean;
 }
 
@@ -65,19 +65,22 @@ export function useTriggerSwitchTransition(parameters: UseTriggerSwitchTransitio
 
       pendingSwitchRef.current?.abort();
       pendingSwitchRef.current = null;
-
-      // `trigger-change` belongs to the open cycle that scheduled it. The selector
-      // stops a closed popup from rendering it, but the value has to be dropped
-      // too: a controlled reopen changes only `openProp`, so neither this effect
-      // nor `setOpen` would run again to replace it, and the selector would start
-      // exposing the old value against the new cycle.
-      if (store.state.instantType === 'trigger-change') {
-        store.set('instantType', undefined);
-      }
     },
   );
 
-  useIsoLayoutEffect(
+  // `trigger-change` belongs to the open cycle that scheduled it. The selector
+  // stops a closed popup from rendering it, but the value has to be dropped
+  // too: a controlled reopen changes only `openProp`, so `setOpen` would not run
+  // again to replace it, and the selector would start exposing the old value
+  // against the new cycle.
+  store.useDerivedValue('instantType', (instantType) =>
+    !access(parameters.open) && instantType === 'trigger-change' ? undefined : KEEP,
+  );
+
+  // Lets the move between triggers animate, then restores `trigger-change` once the
+  // positioner's animations have finished: it follows the DOM, so it is reported
+  // from an effect.
+  useExternalEffect(
     () =>
       [
         access(parameters.domReference),

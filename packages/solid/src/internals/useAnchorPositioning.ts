@@ -1,10 +1,10 @@
-import { createMemo, createSignal } from 'solid-js';
+import { createMemo, createSignal, untrack } from 'solid-js';
 import type { Accessor } from 'solid-js';
 import type { JSX } from '@solidjs/web';
 import { getSide, getAlignment, getSideAxis } from '@floating-ui/utils';
 import type { Rect } from '@floating-ui/utils';
 import { ownerDocument, ownerWindow } from '#utils/owner';
-import { useEffect, useIsoLayoutEffect } from '#utils/useEffect';
+import { useEffect, useIsoLayoutEffect, useExternalEffect } from '#utils/useEffect';
 import { access } from '#utils/access';
 import type { MaybeAccessor } from '#utils/access';
 import { autoUpdate } from '@floating-ui/dom';
@@ -26,6 +26,7 @@ import type {
 import type { FloatingTreeStore } from '../utils/popups/tree/FloatingTreeStore';
 import {
   useBaseUIFloating,
+  deepEqual,
   flip,
   limitShift,
   offset,
@@ -513,16 +514,9 @@ export function useAnchorPositioning(
     return result;
   });
 
-  useIsoLayoutEffect(
-    () => [mounted()] as const,
-    ([isMounted]) => {
-      // Ensure positioning doesn't run initially for `keepMounted` elements that
-      // aren't initially open.
-      if (!isMounted) {
-        interactionStore.clearPositioning();
-      }
-    },
-  );
+  // Ensure positioning doesn't run initially for `keepMounted` elements that
+  // aren't initially open.
+  interactionStore.useClearedPositioning(mounted);
 
   const autoUpdateOptions = createMemo((): AutoUpdateOptions => ({
     ancestorScroll: !disableAnchorTracking(),
@@ -598,38 +592,41 @@ export function useAnchorPositioning(
   const resolvedPosition = (): 'absolute' | 'fixed' =>
     isPositioned() ? positionMethod() : 'fixed';
 
-  const floatingStyles = createMemo<JSX.CSSProperties>(() => {
-    let base: JSX.CSSProperties;
-    if (!isPositioned()) {
-      // Until a position for the current open is computed, ignore any coordinates retained from a
-      // previous open (or from a pass that measured the hidden popup as 0x0). Rendering the
-      // full-size popup at such stale coordinates can overflow the layout viewport, which makes
-      // mobile Chrome zoom the page out and reflow everything the popup is anchored to.
-      base = { position: resolvedPosition(), top: '0', left: '0' };
-    } else if (adaptiveOrigin()) {
-      const { sideX, sideY } = adaptiveSides();
-      base = { position: resolvedPosition(), [sideX]: toPx(x()), [sideY]: toPx(y()) };
-    } else {
-      base = { ...originalFloatingStyles(), position: resolvedPosition() };
-    }
+  const floatingStyles = createMemo<JSX.CSSProperties>(
+    () => {
+      let base: JSX.CSSProperties;
+      if (!isPositioned()) {
+        // Until a position for the current open is computed, ignore any coordinates retained from a
+        // previous open (or from a pass that measured the hidden popup as 0x0). Rendering the
+        // full-size popup at such stale coordinates can overflow the layout viewport, which makes
+        // mobile Chrome zoom the page out and reflow everything the popup is anchored to.
+        base = { position: resolvedPosition(), top: '0', left: '0' };
+      } else if (adaptiveOrigin()) {
+        const { sideX, sideY } = adaptiveSides();
+        base = { position: resolvedPosition(), [sideX]: toPx(x()), [sideY]: toPx(y()) };
+      } else {
+        base = { ...originalFloatingStyles(), position: resolvedPosition() };
+      }
 
-    // Seed the available size vars so consumer `max-height: min(x, var(--available-height))` rules
-    // resolve to a valid length on the first positioning pass, before `size()` writes the real
-    // values. Without a fallback the unresolved `var()` invalidates the whole declaration, so the
-    // popup is measured unconstrained while `flip()` picks its side, against the full content
-    // height rather than the capped one. Seeded unconditionally (not only while `!isPositioned`):
-    // the keys must stay present with a constant value so the per-property style diff never
-    // rewrites them after mount, preserving the px values `size()` sets imperatively. Moving them
-    // into the `!isPositioned` branch makes the renderer remove them once positioned, wiping
-    // `size()`'s values and leaving the popup unconstrained.
-    base[AVAILABLE_WIDTH_VAR] = '100vw';
-    base[AVAILABLE_HEIGHT_VAR] = '100vh';
+      // Seed the available size vars so consumer `max-height: min(x, var(--available-height))` rules
+      // resolve to a valid length on the first positioning pass, before `size()` writes the real
+      // values. Without a fallback the unresolved `var()` invalidates the whole declaration, so the
+      // popup is measured unconstrained while `flip()` picks its side, against the full content
+      // height rather than the capped one. Seeded unconditionally (not only while `!isPositioned`):
+      // the keys must stay present with a constant value so the per-property style diff never
+      // rewrites them after mount, preserving the px values `size()` sets imperatively. Moving them
+      // into the `!isPositioned` branch makes the renderer remove them once positioned, wiping
+      // `size()`'s values and leaving the popup unconstrained.
+      base[AVAILABLE_WIDTH_VAR] = '100vw';
+      base[AVAILABLE_HEIGHT_VAR] = '100vh';
 
-    if (!isPositioned()) {
-      base.opacity = '0';
-    }
-    return base;
-  });
+      if (!isPositioned()) {
+        base.opacity = '0';
+      }
+      return base;
+    },
+    { equals: deepEqual },
+  );
 
   const registeredPositionReferenceRef: { current: Element | VirtualElement | null } = {
     current: null,
@@ -642,7 +639,9 @@ export function useAnchorPositioning(
     return typeof anchorValue === 'function' ? anchorValue() : anchorValue;
   };
 
-  useIsoLayoutEffect(
+  // The anchor can be a ref object, whose element is not reactive, so the position reference is
+  // reported from effects rather than derived.
+  useExternalEffect(
     () => [mounted(), resolvedAnchorValue()] as const,
     ([isMounted, resolvedAnchor]) => {
       if (!isMounted) {
@@ -660,7 +659,7 @@ export function useAnchorPositioning(
     },
   );
 
-  useEffect(
+  useExternalEffect(
     () => [mounted(), params.anchor] as const,
     ([isMounted, anchorValue]) => {
       if (!isMounted) {
@@ -706,7 +705,11 @@ export function useAnchorPositioning(
 
   // Locks the flipped side, and the alignment too when the consumer opts in, while filtering
   // resizes the popup.
-  useIsoLayoutEffect(
+  //
+  // This reacts to a measurement (where Floating UI placed the popup), so it is an effect. The
+  // lock it writes feeds `side` and `placementAlign`, so those are read untracked, and the
+  // effect depends on what they are made of instead (the params), not on its own output.
+  useExternalEffect(
     () =>
       [
         lazyFlip(),
@@ -714,39 +717,31 @@ export function useAnchorPositioning(
         mounted(),
         isPositioned(),
         renderedPlacement(),
-        renderedSide(),
-        renderedAlign(),
-        side(),
-        placementAlign(),
+        sideParam(),
+        align(),
+        isRtl(),
       ] as const,
-    ([
-      currentLazyFlip,
-      currentLockAlign,
-      isMounted,
-      positioned,
-      currentRenderedPlacement,
-      currentRenderedSide,
-      currentRenderedAlign,
-      currentSide,
-      currentPlacementAlign,
-    ]) => {
+    ([currentLazyFlip, currentLockAlign, isMounted, positioned, currentRenderedPlacement]) => {
       if (
         currentLazyFlip &&
         isMounted &&
         positioned &&
-        (currentRenderedSide !== currentSide ||
-          (currentLockAlign && currentRenderedAlign !== currentPlacementAlign))
+        (untrack(renderedSide) !== untrack(side) ||
+          (currentLockAlign && untrack(renderedAlign) !== untrack(placementAlign)))
       ) {
         setMountPlacement(currentRenderedPlacement);
       }
     },
   );
 
-  const arrowStyles = createMemo((): JSX.CSSProperties => ({
-    position: 'absolute',
-    top: toPx(middlewareData().arrow?.y),
-    left: toPx(middlewareData().arrow?.x),
-  }));
+  const arrowStyles = createMemo(
+    (): JSX.CSSProperties => ({
+      position: 'absolute',
+      top: toPx(middlewareData().arrow?.y),
+      left: toPx(middlewareData().arrow?.x),
+    }),
+    { equals: deepEqual },
+  );
 
   const arrowUncentered = createMemo(() => middlewareData().arrow?.centerOffset !== 0);
 

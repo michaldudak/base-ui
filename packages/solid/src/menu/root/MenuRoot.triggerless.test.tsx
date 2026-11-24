@@ -234,14 +234,15 @@ describe('<Menu.Root /> without a trigger', () => {
       const rootIds = vi.fn();
       function CaptureTriggerIds() {
         const { store } = useMenuRootContext();
+        // Solid port: the ids are dependencies. The menu's tree ids are derived from the active
+        // trigger and settle one pass after the trigger registers, so reading them once, when
+        // this effect first runs (as the React test does), would read the Root's own ids.
+        const floatingNodeId = store.useState('floatingNodeId');
+        const floatingParentNodeId = store.useState('floatingParentNodeId');
         useIsoLayoutEffect(
-          () => [store],
-          ([currentStore]) => {
-            registered(
-              currentStore,
-              currentStore.select('floatingNodeId'),
-              currentStore.select('floatingParentNodeId'),
-            );
+          () => [store, floatingNodeId(), floatingParentNodeId()] as const,
+          ([currentStore, nodeId, parentNodeId]) => {
+            registered(currentStore, nodeId, parentNodeId);
           },
         );
         return null;

@@ -1,11 +1,11 @@
-import { createMemo, onCleanup, untrack } from 'solid-js';
+import { createMemo, createSignal, onCleanup, untrack } from 'solid-js';
 import type { Accessor } from 'solid-js';
 import type { SolidStore } from '#utils/store';
 import { EMPTY_OBJECT } from '#utils/empty';
 import type { InteractionType } from '#utils/useEnhancedClickHandler';
 import { access } from '#utils/access';
 import type { MaybeAccessor } from '#utils/access';
-import { useIsoLayoutEffect } from '#utils/useEffect';
+import { useExternalEffect } from '#utils/useEffect';
 import { FOCUSABLE_ATTRIBUTE } from './constants';
 import type { HTMLProps } from '../../internals/types';
 import type {
@@ -30,11 +30,12 @@ export function createDefaultInitialFocus(popupRef: { current: HTMLElement | nul
     interactionType === 'touch' ? popupRef.current : true;
 }
 
-function syncTriggerCount(store: PopupTriggerDataStore<PopupStoreState<unknown>>) {
-  const triggerCount = store.context.triggerElements.size;
-  if (store.select('open') && store.state.triggerCount !== triggerCount) {
-    store.set('triggerCount', triggerCount);
-  }
+/**
+ * Publishes the store's trigger registry to its state, which is what the active trigger is
+ * derived from.
+ */
+function commitTriggers(store: PopupTriggerDataStore<PopupStoreState<unknown>>) {
+  store.set('triggers', store.context.triggerElements.snapshot());
 }
 
 interface TriggerRegistration<State extends PopupStoreState<unknown>> {
@@ -44,84 +45,137 @@ interface TriggerRegistration<State extends PopupStoreState<unknown>> {
 }
 
 /**
- * Registers/unregisters `element` in `store` under `id`, given the previous registration.
- * Returns the new registration.
+ * Registers/unregisters `element` in the registry of `store` under `id`, given the previous
+ * registration. With `commit`, the stores whose registry changed publish it to their state.
  */
 function updateTriggerRegistration<State extends PopupStoreState<unknown>>(
   registrationRef: { current: TriggerRegistration<State> | null },
   element: Element | null,
   store: PopupTriggerDataStore<State>,
   id: string | undefined,
+  commit: boolean,
+  data?: (() => object) | undefined,
 ) {
   const registration = registrationRef.current;
 
-  if (registration !== null) {
-    if (
-      registration.element === element &&
-      registration.store === store &&
-      registration.id === id
-    ) {
-      // Already registered where it belongs, so the caller's migration effect is free on mount.
-      return;
-    }
-
+  if (
+    registration !== null &&
+    (registration.element !== element || registration.store !== store || registration.id !== id)
+  ) {
     registrationRef.current = null;
     const registeredStore = registration.store;
     if (registeredStore.context.triggerElements.getById(registration.id) === registration.element) {
+      const wasActive =
+        registeredStore.select('open') &&
+        registeredStore.select('activeTriggerId') === registration.id;
       registeredStore.context.triggerElements.delete(registration.id);
-      syncTriggerCount(registeredStore);
+      registeredStore.context.triggerData.delete(registration.id);
+      if (commit && registeredStore !== store) {
+        commitTriggers(registeredStore);
+      }
+      if (wasActive) {
+        registeredStore.context.onActiveTriggerUnregistered?.(registration.id);
+      }
     }
   }
 
-  if (element !== null && id !== undefined) {
+  if (registrationRef.current === null && element !== null && id !== undefined) {
     registrationRef.current = { store, id, element };
     store.context.triggerElements.add(id, element);
-    syncTriggerCount(store);
+    if (data) {
+      store.context.triggerData.set(id, data);
+    }
+  }
+
+  if (commit) {
+    commitTriggers(store);
   }
 }
 
 /**
- * Returns a stable callback ref that registers/unregisters the trigger element in the store.
+ * Registers the trigger element in the store under `id`, and returns the ref callback to put on
+ * the trigger element.
  *
- * Stable so a downstream ref merger that retains the callback it was first given still reaches the
- * trigger's current store. The registration is tracked as a `(store, id, element)` triple, so
- * unregistering targets the store the element was actually registered in.
- *
- * Since the callback never changes, the caller must re-run it from a layout effect keyed on
- * `[store, id]` to migrate an already-registered element. That effect is also what registers the
- * element in the first place when `id` only resolves after the first commit (React 17's `useId`
- * fallback), because the register call made while the id is still `undefined` does nothing.
+ * Registration has two halves. The ref callback adds the element to the store's registry as soon
+ * as the element is created, so a handle can find the trigger by id before any effect runs. An
+ * effect then publishes the registry to the store's state, where the active trigger is derived
+ * from it; it also moves the registration when the store or the id changes, and removes it when
+ * the trigger is disposed.
  *
  * @param id Id of the trigger.
  * @param store The Store instance where the trigger should be registered.
+ * @param data What the trigger forwards to the popup while the popup belongs to it.
  */
 export function useTriggerRegistration<State extends PopupStoreState<unknown>>(
   id: MaybeAccessor<string | undefined>,
   store: MaybeAccessor<PopupTriggerDataStore<State>>,
+  data?: Accessor<object>,
 ) {
   const registrationRef: { current: TriggerRegistration<State> | null } = { current: null };
 
-  return (element: Element | null) => {
-    updateTriggerRegistration(registrationRef, element, access(store), access(id));
+  // The values the ref callback uses. It runs while the trigger is created, before any effect, so
+  // it starts with the initial values (read once on purpose); the effect keeps them current.
+  const latest = {
+    store: untrack(() => access(store)),
+    id: untrack(() => access(id)),
   };
+
+  // A signal, so that the effect runs again when the trigger renders another element.
+  const [element, setElement] = createSignal<Element | null>(null, { ownedWrite: true });
+
+  const registerTrigger = (triggerElement: Element | null) => {
+    updateTriggerRegistration(
+      registrationRef,
+      triggerElement,
+      latest.store,
+      latest.id,
+      false,
+      data,
+    );
+    setElement(triggerElement);
+  };
+
+  useExternalEffect(
+    () => [access(store), access(id), element()] as const,
+    ([currentStore, currentId, currentElement]) => {
+      latest.store = currentStore;
+      latest.id = currentId;
+      updateTriggerRegistration(
+        registrationRef,
+        currentElement,
+        currentStore,
+        currentId,
+        true,
+        data,
+      );
+      return () => {
+        updateTriggerRegistration(registrationRef, null, currentStore, currentId, true);
+      };
+    },
+  );
+
+  return registerTrigger;
 }
 
 /**
- * Sets up trigger data forwarding to the store.
+ * Registers the trigger together with the data it forwards to the popup while the popup belongs
+ * to it (its payload, for example).
+ *
+ * Nothing is copied into the store from here. The Root derives the store's values from the active
+ * trigger's data (see `useActiveTriggerData`), so they change in the same pass as the active
+ * trigger does.
  *
  * @param triggerId Id of the trigger.
- * @param triggerElementRef Ref for the trigger DOM element.
  * @param store The Store instance managing the popup state.
- * @param stateUpdates An object with state updates to apply when the trigger is active.
+ * @param triggerData The data of this trigger.
  */
 export function useTriggerDataForwarding<
   State extends PopupStoreState<unknown>,
   const Key extends keyof Omit<State, 'activeTriggerId' | 'activeTriggerElement'>,
 >(
   triggerId: MaybeAccessor<string | undefined>,
-  triggerElementRef: { current: Element | null },
   store: MaybeAccessor<PopupTriggerDataStore<State>>,
-  stateUpdates: Accessor<Pick<State, Key>>,
+  triggerData: Accessor<Pick<State, Key>>,
 ) {
   // The store can change (a handle switching between its fallback store and a root's store), so
   // the selector is re-created for the current store.
@@ -130,96 +184,20 @@ export function useTriggerDataForwarding<
   );
 
   // Compared by value, like the spread `Object.values(stateUpdates)` dependencies in React.
-  const stateUpdatesValue = createMemo(stateUpdates, { equals: shallowEqual });
+  const data = createMemo(triggerData, { equals: shallowEqual });
 
-  // The values the ref callback and the effects below last saw. The ref callback runs while the
-  // trigger is created, before any effect, so it starts with the initial values (read once on
-  // purpose); the effects keep them current.
-  const latest = {
-    store: untrack(() => access(store)),
-    triggerId: untrack(() => access(triggerId)),
-    stateUpdates: untrack(stateUpdatesValue),
-  };
-
-  const registrationRef: { current: TriggerRegistration<State> | null } = { current: null };
-
-  // Applies trigger-owned state (active-trigger ownership and payload) when the trigger registers.
-  // Stable so payload/`stateUpdates` changes do not change the ref identity (which would needlessly
-  // churn registration); it reads the latest closure values when invoked.
-  const applyTriggerData = (element: Element) => {
-    const currentStore = latest.store;
-    const currentTriggerId = latest.triggerId;
-    const open = currentStore.select('open');
-    const activeTriggerId = currentStore.select('activeTriggerId');
-
-    if (activeTriggerId === currentTriggerId) {
-      const changes = {
-        activeTriggerElement: element,
-        ...(open ? latest.stateUpdates : null),
-      } as Pick<Readonly<State>, Key | 'activeTriggerElement'>;
-      currentStore.update(changes);
-      return;
-    }
-
-    if (activeTriggerId == null && open && !currentStore.state.openedWithoutTrigger) {
-      // If a popup is already open, a detached trigger can mount before any active trigger
-      // has been established. Claim the first registered trigger so trigger-owned focus
-      // management and ARIA relationships work. A popup opened deliberately without a trigger
-      // stays unassociated so the trigger's `payload` does not replace the programmatic one.
-      const changes = {
-        activeTriggerId: currentTriggerId ?? null,
-        activeTriggerElement: element,
-        ...latest.stateUpdates,
-      } as Pick<Readonly<State>, Key | 'activeTriggerId' | 'activeTriggerElement'>;
-      currentStore.update(changes);
-    }
-  };
-
-  // Stable, so the merged ref on the rendered element keeps its identity for the trigger's whole
-  // lifetime.
-  const registerTrigger = (element: Element | null) => {
-    updateTriggerRegistration(registrationRef, element, latest.store, latest.triggerId);
-    if (element) {
-      applyTriggerData(element);
-    }
-  };
-
-  useIsoLayoutEffect(
-    () => [stateUpdatesValue()] as const,
-    ([updates]) => {
-      latest.stateUpdates = updates;
-    },
-  );
-
-  // A stable ref does not re-fire on a store or id change, so migrate here instead: unregister from
-  // the previous store, then register the element the trigger still renders into the current one.
-  useIsoLayoutEffect(
-    () => [access(store), access(triggerId)] as const,
-    ([currentStore, currentTriggerId]) => {
-      latest.store = currentStore;
-      latest.triggerId = currentTriggerId;
-      registerTrigger(triggerElementRef.current);
-      return () => registerTrigger(null);
-    },
-  );
-
-  useIsoLayoutEffect(
-    () => [isMountedByThisTrigger(), access(store), stateUpdatesValue()] as const,
-    ([isMounted, currentStore, updates]) => {
-      if (isMounted) {
-        const changes = {
-          activeTriggerElement: triggerElementRef.current,
-          ...updates,
-        } as Pick<Readonly<State>, Key | 'activeTriggerElement'>;
-        currentStore.update(changes);
-      }
-    },
-  );
+  const registerTrigger = useTriggerRegistration(triggerId, store, data);
 
   return { registerTrigger, isMountedByThisTrigger };
 }
 
-function shallowEqual(a: object, b: object) {
+export function shallowEqual(a: object | undefined, b: object | undefined) {
+  if (a === b) {
+    return true;
+  }
+  if (a === undefined || b === undefined) {
+    return false;
+  }
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
   if (aKeys.length !== bKeys.length) {

@@ -10,3 +10,29 @@
 
 - `src/menu/positioner/MenuPositioner.test.tsx`, `positionerConformanceTests` call: `viewport: true` became `viewport: false`, so "uses top/left positioning with Viewport" and "updates positioning when Viewport mounts and unmounts" are not registered. `Menu.Viewport` is not ported (out of scope for the proof of concept).
 - `test/setup.ts`: Solid passes the error that halted the reactive system to `reportError`, which a real browser turns into an uncaught error. It is ignored only while a test mocks `console.error`, the same rule as for the `[REACTIVITY_HALTED]` console message.
+
+## Native Solid state redesign
+
+Solid's reactivity diagnostics are enabled in `test/setup.ts` (`attribution.enable`), so a
+component that syncs state with an effect now fails the test that renders it.
+
+- `test/testUtils.ts`: new `allowSolidDiagnostics(...codes)`. It lets a test's own fixture trigger
+  the named diagnostics; any other warning still fails.
+- `root/MenuRoot.test.tsx`, "unmounts the popup when a layout effect closes it right after a press
+  opens it" and "completes initial opening once when a later update replaces the container ref":
+  call `allowSolidDiagnostics('EFFECT_WRITES_OWN_SOURCE', 'EFFECT_RELAY_TEAR')`. The fixtures are
+  app code that writes state from an effect on purpose (that is what the tests are about).
+- `root/MenuRoot.test.tsx`, "releases the subscriptions a submenu adds to its parent store when it
+  unmounts" and "releases them under StrictMode": skipped, no Solid equivalent. A submenu's store
+  no longer subscribes to its parent's store; its selectors read the parent's state reactively
+  and Solid releases those dependencies with the submenu's owner. There is no subscription to
+  count.
+- `root/MenuRoot.test.tsx`, "notifies submenu subscribers…": the React test subscribes to the
+  submenu's store and writes the parent's `rootId`. It now observes a submenu store accessor
+  (`useState('keyboardEventRelay')`) from an effect and writes the parent's `keyboardEventRelay`.
+  `rootId` is derived from a prop here and can't be written; the assertion is stricter (last call
+  receives the new value).
+- `root/MenuRoot.triggerless.test.tsx`, "preserves real trigger registration…": the
+  `CaptureTriggerIds` fixture depends on `floatingNodeId` and `floatingParentNodeId` instead of
+  reading them once. They are derived from the active trigger and settle one pass after the
+  trigger registers.

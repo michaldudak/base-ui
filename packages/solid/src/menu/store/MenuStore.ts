@@ -57,6 +57,20 @@ export type State<Payload> = PopupStoreState<Payload> & {
   adaptiveOrigin: AdaptiveOriginMiddleware | undefined;
 };
 
+/**
+ * What a `Menu.Trigger` forwards to the menu while the menu is open from it.
+ */
+export type MenuTriggerData<Payload> = Pick<
+  State<Payload>,
+  | 'payload'
+  | 'closeDelay'
+  | 'parent'
+  | 'floatingTreeRoot'
+  | 'floatingNodeId'
+  | 'floatingParentNodeId'
+  | 'keyboardEventRelay'
+>;
+
 type Context = PopupStoreContext<MenuRoot.ChangeEventDetails> & {
   readonly positionerRef: { current: HTMLElement | null };
   readonly popupRef: { current: HTMLElement | null };
@@ -121,7 +135,7 @@ const selectors = {
   parent: (state: State<unknown>) => state.parent,
   rootId: (state: State<unknown>): string | undefined => {
     if (state.parent.type === 'menu') {
-      return state.parent.store.select('rootId');
+      return state.parent.store.selectFor(state, 'rootId');
     }
 
     return state.parent.type !== undefined ? state.parent.context.rootId() : state.rootId;
@@ -157,7 +171,7 @@ const selectors = {
   lastOpenChangeReason: (state: State<unknown>) => state.openChangeReason,
   floatingTreeRoot: (state: State<unknown>): FloatingTreeStore => {
     if (state.parent.type === 'menu') {
-      return state.parent.store.select('floatingTreeRoot');
+      return state.parent.store.selectFor(state, 'floatingTreeRoot');
     }
 
     return state.floatingTreeRoot;
@@ -174,7 +188,7 @@ const selectors = {
     }
 
     if (state.parent.type === 'menu') {
-      return state.parent.store.select('keyboardEventRelay');
+      return state.parent.store.selectFor(state, 'keyboardEventRelay');
     }
 
     return undefined;
@@ -211,42 +225,6 @@ export class MenuStore<Payload> extends BasePopupStore<
       } else if (parent.type !== undefined) {
         this.context.allowMouseUpTriggerRef = parent.context.allowMouseUpTriggerRef;
       }
-    });
-  }
-
-  /**
-   * Propagates changes of the parent menu's shared tree state to this store's subscribers.
-   * The owning `Menu.Root` calls it from an effect so the parent store subscription is released
-   * when the submenu unmounts.
-   * @returns A function that removes the parent store subscription.
-   */
-  subscribeToParentMenu() {
-    const parent = this.state.parent;
-    if (parent.type !== 'menu') {
-      return undefined;
-    }
-
-    let rootId = parent.store.select('rootId');
-    let floatingTreeRoot = parent.store.select('floatingTreeRoot');
-    let keyboardEventRelay = parent.store.select('keyboardEventRelay');
-
-    return parent.store.subscribe(() => {
-      const nextRootId = parent.store.select('rootId');
-      const nextFloatingTreeRoot = parent.store.select('floatingTreeRoot');
-      const nextKeyboardEventRelay = parent.store.select('keyboardEventRelay');
-
-      if (
-        rootId === nextRootId &&
-        floatingTreeRoot === nextFloatingTreeRoot &&
-        keyboardEventRelay === nextKeyboardEventRelay
-      ) {
-        return;
-      }
-
-      rootId = nextRootId;
-      floatingTreeRoot = nextFloatingTreeRoot;
-      keyboardEventRelay = nextKeyboardEventRelay;
-      this.notifyAll();
     });
   }
 

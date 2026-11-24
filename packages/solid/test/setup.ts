@@ -3,9 +3,18 @@ import failOnConsole from 'vitest-fail-on-console';
 import '@testing-library/jest-dom/vitest';
 import './addVitestMatchers';
 import { flush } from 'solid-js';
+import { attribution } from 'solid-js/attribution';
 import { cleanup } from './internal-test-utils';
 import { reset as resetError } from '../src/base-utils/error';
 import { resetAnimationFrameScheduler } from '../src/base-utils/useAnimationFrame';
+
+// Solid's attribution engine reports effects that write state their own inputs depend on
+// (`EFFECT_RELAY_TEAR`, `EFFECT_WRITES_OWN_SOURCE`): state that should be derived instead. The
+// Vite plugin enables it in the dev server; enabling it here makes those reports fail tests.
+// `log: false` leaves out the per-run "why did this run" log. `hotTime` is a wall-clock budget
+// (8ms of compute per second in one scope), which says more about the machine and the test
+// environment than about the code, so it is off here.
+attribution.enable({ log: false, hotTime: false });
 
 const cleanupStarted = new WeakSet<object>();
 

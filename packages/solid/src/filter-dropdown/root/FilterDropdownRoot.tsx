@@ -1,6 +1,6 @@
 import { createMemo, createSignal, untrack, useContext } from 'solid-js';
 import type { JSX } from '@solidjs/web';
-import { useIsoLayoutEffect } from '#utils/useEffect';
+import { useExternalEffect } from '#utils/useEffect';
 import { getFilter } from '../../internals/filter';
 import { useBaseUiId } from '../../internals/useBaseUiId';
 import { useItemRegistry } from '../../internals/useItemRegistry';
@@ -126,7 +126,8 @@ export function FilterDropdownRoot(props: FilterDropdownRoot.Props): JSX.Element
   // Re-runs on the registry snapshot published once every item in the commit has registered,
   // and on the committed query, because a controlled consumer can reject a proposed change. It
   // reads the live registry so items registered in this commit count before their snapshot.
-  useIsoLayoutEffect(
+  // The matching reads each item's rendered text, so the result is reported from an effect.
+  useExternalEffect(
     () =>
       [
         props.open,

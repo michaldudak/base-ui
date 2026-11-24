@@ -6,7 +6,6 @@ import { platform } from '#utils/platform';
 import { access } from '#utils/access';
 import type { MaybeAccessor } from '#utils/access';
 import type { HTMLProps } from '../../../internals/types';
-import { useValueChanged } from '../../../internals/useValueChanged';
 
 export function useOpenMethodTriggerProps(
   open: MaybeAccessor<boolean>,
@@ -40,23 +39,14 @@ export function useOpenMethodTriggerProps(
  * @param open The open state of the component.
  */
 export function useOpenInteractionType(open: MaybeAccessor<boolean>) {
-  const [openMethod, setOpenMethod] = createSignal<InteractionType | null>(null, {
-    ownedWrite: true,
-  });
+  // A writable derived signal: the trigger writes the method while the popup opens, and closing
+  // the popup resets it. (React resets it from an effect that watches `open`.)
+  const [openMethod, setOpenMethod] = createSignal<InteractionType | null>(
+    (previous) => (access(open) ? (previous ?? null) : null),
+    { ownedWrite: true },
+  );
 
   const triggerProps = useOpenMethodTriggerProps(open, setOpenMethod);
-
-  useValueChanged(
-    () => access(open),
-    (previousOpen: boolean) => {
-      // `onChange` runs only when the boolean changed, so the current value is the opposite of
-      // `previousOpen` (accessors can't be read inside an effect's apply function).
-      const currentOpen = !previousOpen;
-      if (previousOpen && !currentOpen) {
-        setOpenMethod(null);
-      }
-    },
-  );
 
   return {
     openMethod,

@@ -220,7 +220,7 @@ export function useMenuFilterKeyDown(hasValue: MaybeAccessor<boolean>) {
         stopEvent(event);
         const returnElement =
           (store.state.parent.type === 'menu' && submenuContext?.getReturnElement?.()) ||
-          store.state.activeTriggerElement;
+          store.select('lastActiveTriggerElement');
         const details = createChangeEventDetails(REASONS.focusOut, event);
         store.setOpen(false, details);
         if (!details.isCanceled && isHTMLElement(returnElement)) {

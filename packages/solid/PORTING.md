@@ -13,11 +13,15 @@ port took, where it differs from React, and what is still open.
   (FilterProvider, Input, List, Empty, Clear, FilterSubmenuRoot).
 - **Not ported:** `Menu.Viewport`, Menubar, ContextMenu (only their context definitions exist, so
   Menu's checks for them compile), server rendering.
-- **Tests (jsdom):** 1,045 pass, 274 are skipped, 0 fail (1,319 tests in 37 files). Most skips are browser-only tests
-  (`skipIf(isJSDOM)`), as in React.
-- **Tests (Chromium):** 1,274 pass, 45 are skipped, 0 fail. The 45 are listed in `test-changes/`: tests that
-  need parts outside the scope, and seven with no Solid equivalent.
-- **Playground:** `playground/solid` has the 11 Menu demos from the docs, checked in Chromium.
+- **Tests (jsdom):** 1,043 pass, 276 are skipped, 0 fail (1,319 tests in 37 files). Most skips are
+  browser-only tests (`skipIf(isJSDOM)`), as in React.
+- **Tests (Chromium):** 1,272 pass, 47 are skipped, 0 fail. The 47 are listed in `test-changes/`:
+  tests that need parts outside the scope, and nine with no Solid equivalent.
+- **Solid diagnostics:** the test setup turns on Solid's attribution engine and every warning fails
+  the test, so both runs are also free of `EFFECT_RELAY_TEAR`, `EFFECT_WRITES_OWN_SOURCE`,
+  `WASTED_RECOMPUTE` and `UNSTABLE_MEMO_OUTPUT`. The playground's dev console is empty.
+- **Playground:** `playground/solid` has the 11 Menu demos from the docs, checked in Chromium
+  (68 scripted checks).
 
 ### Running it
 
@@ -37,17 +41,19 @@ pnpm vite                                 # demos
 
 ## What the port took
 
-### 1. A third of the code moved over unchanged, half needed real adaptation
+### 1. A third of the code moved over unchanged, almost half needed real adaptation
 
-The ledger at the end compares every file with its React original. By lines of code, about a third
-of the source is reused or only lightly touched (constants, data attributes, selectors, the store
-classes, DOM utilities, event predicates). Half is "adapted": the same logic and structure, with the
-hook plumbing rewritten. The rest was rewritten, mostly components whose React version is dominated
-by render logic.
+The ledger at the end compares every file with its React original. By lines of code, a third of
+the source is reused or only lightly touched (constants, data attributes, DOM utilities, event
+predicates, list navigation maths). A little under half is "adapted": the same logic and
+structure, with the hook plumbing rewritten. The rest was rewritten or is new: components whose
+React version is dominated by render logic, and the state layer described in section 3.
 
 Everything that does not touch React is portable as is. In Base UI that is more than it looks:
-`Store`, `MenuStore`, selectors, floating tree, safe polygon, list navigation maths, typeahead
-matching, DOM and event helpers. A shared, framework-neutral core is realistic for these.
+the base `Store`, floating tree, safe polygon, list navigation maths, typeahead matching, DOM and
+event helpers. A shared, framework-neutral core is realistic for these. The popup and menu stores
+are the exception: their selectors and write paths are shaped by how each framework keeps state
+in sync (section 3), so they would be shared only in part.
 
 ### 2. Tests ported almost mechanically
 
@@ -65,7 +71,7 @@ a light edit of the original. That needed a Solid stand-in for `@mui/internal-te
 Every test that needed more than a mechanical change, and every skipped test, is listed with a
 reason in `test-changes/*.md`.
 
-### 3. The store survived; hooks became functions that return accessors
+### 3. The store survived, but state that React syncs with effects had to become derived
 
 Keeping the framework-neutral `MenuStore` and bridging it to signals (`SolidStore`) worked well. The
 store is synchronous, so event handlers read `store.state` right after writing it, which matters
@@ -76,6 +82,44 @@ React hooks map to plain functions called once. Their parameters became "value o
 return values became accessors, and prop bags became functions returning props. Deciding this
 convention early (PORTING_GUIDE sections 3 to 5) is what made it possible to port files in
 parallel.
+
+What did not survive is how React Base UI keeps state in sync. It copies props into the store in
+layout effects, resets state in effects when something else changes, and lets each trigger write
+"I am the active trigger" from its own effect. A first, faithful port did the same. It passed the
+tests, and Solid's development build reported it everywhere: an effect that writes state its own
+inputs depend on makes the graph settle in two passes, and what is read in between is inconsistent
+(`EFFECT_RELAY_TEAR`, `EFFECT_WRITES_OWN_SOURCE`). In React the same design costs a second render
+and nobody is told.
+
+The second pass of this port removed those effects. Every piece of state now has one of three
+shapes (PORTING_GUIDE section 4 has the rules):
+
+- **Derived.** A store key can have a source: `store.useSyncedValue('disabled', () => props.disabled)`
+  makes the key _be_ the prop, instead of copying it. The active trigger, its element, the anchor,
+  the popup id and the trigger count are selectors over a `triggers` map and the open state, not
+  values each trigger writes. A submenu reads its parent's store reactively instead of subscribing
+  to it.
+- **Derived, but writable.** State that resets when something else changes ("hover is enabled
+  again when the menu closes", "the payload follows the active trigger, unless a handle set one")
+  uses `store.useDerivedValue(key, previous => ...)`, a thin layer over Solid's writable derived
+  signal `createSignal(fn)`. The function returns the new value or `KEEP`.
+- **An effect, only when the outside world is involved.** Focusing, measuring, waiting for
+  animations, registering in a `Map`, dispatching events. These use `useExternalEffect`, and their
+  dependencies never include what they write.
+
+Two findings from that work are worth knowing before porting anything else:
+
+- **Effects of one component do not run in the order they are declared.** Solid 2 runs them as
+  their dependencies settle. The React idiom "the last effect stores the previous value in a ref
+  for the next render" silently breaks; an effect takes the previous values of its own
+  dependencies instead (the second argument of `useEffect` here).
+- **The diagnostics are a good test oracle.** With them enabled in the test setup, 530 of the
+  1,043 jsdom tests failed at first. After the redesign none do, and the jsdom run went from
+  several minutes to under one, because nothing settles twice any more.
+
+About 30 source files changed for this. The logic that decides _what_ happens (open-change
+reasons, hover and dismiss rules, list navigation) is untouched; what changed is where values
+live.
 
 ### 4. Where React and Solid really differ
 
@@ -141,13 +185,11 @@ reasons, handles) is unchanged.
 
 ## Open issues
 
-1. **Solid development diagnostics.** In a dev build the console shows `[EFFECT_RELAY_TEAR]` and
-   `[EFFECT_WRITES_OWN_SOURCE]` for the menu root, submenu root, filter root and focus manager.
-   They are performance hints, not errors: an effect writes store state that its own inputs depend
-   on, so that flush settles in two passes. This is the React design carried over (props synced
-   into the store by effects, state reset by effects), where the same thing shows up as a second
-   render. An idiomatic Solid version would derive these values with memos instead. It is the
-   largest piece of redesign a production port would need.
+1. **One state write is deferred by a microtask.** A filtered submenu hands focus back to its input
+   when the parent's list navigation focuses its trigger. The trigger's `blur` then clears the
+   parent's highlight while the effect that moved focus is still running. That write is queued
+   with `queueMicrotask` so it lands after the effect (`MenuSubmenuTrigger`). The behaviour matches
+   React, but a cleaner design would not focus the trigger in the first place.
 2. **Text of a hidden filtered item.** An item that is filtered out is not rendered, and its
    children cannot be read without rendering them, so it keeps the text it last rendered. If its
    text changes while hidden, the filter matches the old text. Workaround: the item's `label` prop.
@@ -183,20 +225,20 @@ Each Solid file is compared with the React file at the same path (`packages/reac
 
 | Category        |   Files | Lines of code | Share of lines |
 | --------------- | ------: | ------------: | -------------: |
-| Reused          |      93 |         3,761 |            22% |
-| Lightly adapted |      25 |         1,936 |            11% |
-| Adapted         |      68 |         8,438 |            49% |
-| Rewritten       |      46 |         3,035 |            17% |
-| New             |       3 |           194 |             1% |
-| **Total**       | **235** |    **17,364** |                |
+| Reused          |      90 |         3,332 |            19% |
+| Lightly adapted |      28 |         2,421 |            14% |
+| Adapted         |      65 |         7,811 |            44% |
+| Rewritten       |      48 |         3,575 |            20% |
+| New             |       3 |           481 |             3% |
+| **Total**       | **234** |    **17,620** |                |
 
 ### Test files
 
 | Category        |  Files | Lines of code | Share of lines |
 | --------------- | -----: | ------------: | -------------: |
-| Lightly adapted |     29 |        18,901 |            97% |
+| Lightly adapted |     29 |        18,911 |            97% |
 | Adapted         |      8 |           639 |             3% |
-| **Total**       | **37** |    **19,540** |                |
+| **Total**       | **37** |    **19,550** |                |
 
 ### By area (source files)
 
@@ -206,7 +248,7 @@ Each Solid file is compared with the React file at the same path (`packages/reac
 | `context-menu`                 |     1 |        |                 |         |         1 |     |
 | `direction-provider`           |     3 |      2 |                 |         |         1 |     |
 | `filter-dropdown`              |    12 |      1 |               1 |       8 |         2 |     |
-| `internals`                    |    26 |      8 |               6 |       6 |         6 |     |
+| `internals`                    |    25 |      8 |               6 |       5 |         6 |     |
 | `internals/composite`          |     9 |      3 |                 |       3 |         3 |     |
 | `internals/direction-context`  |     1 |        |                 |         |         1 |     |
 | `internals/use-button`         |     2 |      1 |                 |       1 |           |     |
@@ -236,7 +278,7 @@ Each Solid file is compared with the React file at the same path (`packages/reac
 | `menu/store`                   |     2 |      1 |               1 |         |           |     |
 | `menu/submenu-root`            |     2 |        |               1 |         |         1 |     |
 | `menu/submenu-trigger`         |     2 |      1 |                 |         |         1 |     |
-| `menu/trigger`                 |     3 |      1 |                 |       2 |           |     |
+| `menu/trigger`                 |     3 |      1 |                 |       1 |         1 |     |
 | `menu/utils`                   |     4 |      4 |                 |         |           |     |
 | `menubar`                      |     1 |        |                 |       1 |           |     |
 | `merge-props`                  |     2 |        |                 |         |         2 |     |
@@ -245,8 +287,8 @@ Each Solid file is compared with the React file at the same path (`packages/reac
 | `tooltip`                      |     1 |      1 |                 |         |           |     |
 | `types`                        |     1 |        |                 |       1 |           |     |
 | `utils`                        |     9 |      4 |               2 |         |         3 |     |
-| `utils/popups`                 |    20 |     10 |               2 |       5 |         3 |     |
-| `utils/popups/floating-root`   |     4 |      3 |                 |         |         1 |     |
+| `utils/popups`                 |    20 |      8 |               4 |       4 |         4 |     |
+| `utils/popups/floating-root`   |     4 |      2 |               1 |         |         1 |     |
 | `utils/popups/focus`           |     5 |      3 |                 |       1 |         1 |     |
 | `utils/popups/interactions`    |    12 |      2 |               2 |       6 |         2 |     |
 | `utils/popups/portal`          |     1 |        |                 |       1 |           |     |
@@ -307,7 +349,7 @@ Each Solid file is compared with the React file at the same path (`packages/reac
 | `filter-dropdown/list/FilterDropdownList.tsx`                             | `packages/react`, same path | Adapted         |        61% |
 | `filter-dropdown/root/FilterDropdownRoot.tsx`                             | `packages/react`, same path | Adapted         |        51% |
 | `filter-dropdown/root/FilterDropdownRootContext.ts`                       | `packages/react`, same path | Adapted         |        71% |
-| `filter-dropdown/root/useFilterDropdownCloseQuery.ts`                     | `packages/react`, same path | Rewritten       |        35% |
+| `filter-dropdown/root/useFilterDropdownCloseQuery.ts`                     | `packages/react`, same path | Rewritten       |        12% |
 | `filter-dropdown/store.ts`                                                | `packages/react`, same path | Lightly adapted |        95% |
 | `filter-dropdown/utils/refocusOwner.ts`                                   | `packages/react`, same path | Reused          |       100% |
 | `internals/TransitionStatusDataAttributes.ts`                             | `packages/react`, same path | Reused          |       100% |
@@ -337,7 +379,7 @@ Each Solid file is compared with the React file at the same path (`packages/reac
 | `internals/types.ts`                                                      | `packages/react`, same path | Adapted         |        54% |
 | `internals/use-button/index.ts`                                           | `packages/react`, same path | Reused          |       100% |
 | `internals/use-button/useButton.ts`                                       | `packages/react`, same path | Adapted         |        61% |
-| `internals/useAnchorPositioning.ts`                                       | `packages/react`, same path | Adapted         |        51% |
+| `internals/useAnchorPositioning.ts`                                       | `packages/react`, same path | Adapted         |        52% |
 | `internals/useAnimationsFinished.ts`                                      | `packages/react`, same path | Lightly adapted |        91% |
 | `internals/useBaseUiId.ts`                                                | `packages/react`, same path | Rewritten       |        25% |
 | `internals/useInitialLiveRegionTextMutation.ts`                           | `packages/react`, same path | Lightly adapted |        81% |
@@ -345,9 +387,8 @@ Each Solid file is compared with the React file at the same path (`packages/reac
 | `internals/useOpenChangeComplete.tsx`                                     | `packages/react`, same path | Rewritten       |        43% |
 | `internals/useRenderElement.tsx`                                          | `packages/react`, same path | Rewritten       |        15% |
 | `internals/useTransitionStatus.ts`                                        | `packages/react`, same path | Rewritten       |        46% |
-| `internals/useTriggerSwitchTransition.ts`                                 | `packages/react`, same path | Adapted         |        70% |
-| `internals/useUnmountAfterClose.ts`                                       | `packages/react`, same path | Adapted         |        51% |
-| `internals/useValueChanged.ts`                                            | `packages/react`, same path | Rewritten       |        17% |
+| `internals/useTriggerSwitchTransition.ts`                                 | `packages/react`, same path | Adapted         |        61% |
+| `internals/useUnmountAfterClose.ts`                                       | `packages/react`, same path | Rewritten       |        39% |
 | `menu/arrow/MenuArrow.test.tsx`                                           | `packages/react`, same path | Adapted         |        59% |
 | `menu/arrow/MenuArrow.tsx`                                                | `packages/react`, same path | Adapted         |        54% |
 | `menu/arrow/MenuArrowDataAttributes.ts`                                   | `packages/react`, same path | Reused          |       100% |
@@ -406,7 +447,7 @@ Each Solid file is compared with the React file at the same path (`packages/reac
 | `menu/item/MenuItem.tsx`                                                  | `packages/react`, same path | Adapted         |        51% |
 | `menu/item/MenuItemDataAttributes.ts`                                     | `packages/react`, same path | Reused          |       100% |
 | `menu/item/useMenuItem.ts`                                                | `packages/react`, same path | Rewritten       |        49% |
-| `menu/item/useMenuItemCommonProps.ts`                                     | `packages/react`, same path | Rewritten       |        48% |
+| `menu/item/useMenuItemCommonProps.ts`                                     | `packages/react`, same path | Rewritten       |        49% |
 | `menu/link-item/MenuLinkItem.test.tsx`                                    | `packages/react`, same path | Lightly adapted |        84% |
 | `menu/link-item/MenuLinkItem.tsx`                                         | `packages/react`, same path | Rewritten       |        49% |
 | `menu/link-item/MenuLinkItemDataAttributes.ts`                            | `packages/react`, same path | Reused          |       100% |
@@ -439,19 +480,19 @@ Each Solid file is compared with the React file at the same path (`packages/reac
 | `menu/root/MenuRoot.detached-triggers.test.tsx`                           | `packages/react`, same path | Lightly adapted |        90% |
 | `menu/root/MenuRoot.test.tsx`                                             | `packages/react`, same path | Lightly adapted |        86% |
 | `menu/root/MenuRoot.triggerless.test.tsx`                                 | `packages/react`, same path | Lightly adapted |        84% |
-| `menu/root/MenuRoot.tsx`                                                  | `packages/react`, same path | Adapted         |        60% |
+| `menu/root/MenuRoot.tsx`                                                  | `packages/react`, same path | Adapted         |        57% |
 | `menu/root/MenuRootContext.ts`                                            | `packages/react`, same path | Adapted         |        57% |
 | `menu/store/MenuHandle.ts`                                                | `packages/react`, same path | Reused          |       100% |
-| `menu/store/MenuStore.ts`                                                 | `packages/react`, same path | Lightly adapted |        94% |
+| `menu/store/MenuStore.ts`                                                 | `packages/react`, same path | Lightly adapted |        88% |
 | `menu/submenu-root/MenuSubmenuRoot.tsx`                                   | `packages/react`, same path | Lightly adapted |        83% |
 | `menu/submenu-root/MenuSubmenuRootContext.ts`                             | `packages/react`, same path | Rewritten       |        45% |
 | `menu/submenu-trigger/MenuSubmenuTrigger.screenReaderPress.test.tsx`      | `packages/react`, same path | Lightly adapted |        94% |
 | `menu/submenu-trigger/MenuSubmenuTrigger.test.tsx`                        | `packages/react`, same path | Lightly adapted |        90% |
-| `menu/submenu-trigger/MenuSubmenuTrigger.tsx`                             | `packages/react`, same path | Rewritten       |        50% |
+| `menu/submenu-trigger/MenuSubmenuTrigger.tsx`                             | `packages/react`, same path | Rewritten       |        45% |
 | `menu/submenu-trigger/MenuSubmenuTrigger.voiceOver.test.tsx`              | `packages/react`, same path | Lightly adapted |        93% |
 | `menu/submenu-trigger/MenuSubmenuTriggerDataAttributes.ts`                | `packages/react`, same path | Reused          |       100% |
 | `menu/trigger/MenuTrigger.test.tsx`                                       | `packages/react`, same path | Lightly adapted |        84% |
-| `menu/trigger/MenuTrigger.tsx`                                            | `packages/react`, same path | Adapted         |        51% |
+| `menu/trigger/MenuTrigger.tsx`                                            | `packages/react`, same path | Rewritten       |        50% |
 | `menu/trigger/MenuTriggerDataAttributes.ts`                               | `packages/react`, same path | Reused          |       100% |
 | `menu/trigger/useMixedToggleClickHandler.ts`                              | `packages/react`, same path | Adapted         |        56% |
 | `menu/utils/findRootOwnerId.ts`                                           | `packages/react`, same path | Reused          |       100% |
@@ -482,7 +523,7 @@ Each Solid file is compared with the React file at the same path (`packages/reac
 | `utils/popups/createEventEmitter.ts`                                      | `packages/react`, same path | Reused          |       100% |
 | `utils/popups/element.ts`                                                 | `packages/react`, same path | Reused          |       100% |
 | `utils/popups/event.ts`                                                   | `packages/react`, same path | Lightly adapted |        94% |
-| `utils/popups/floating-root/FloatingRootStore.ts`                         | `packages/react`, same path | Reused          |        98% |
+| `utils/popups/floating-root/FloatingRootStore.ts`                         | `packages/react`, same path | Lightly adapted |        90% |
 | `utils/popups/floating-root/dispatchOpenChange.ts`                        | `packages/react`, same path | Reused          |       100% |
 | `utils/popups/floating-root/getEmptyRootStore.ts`                         | `packages/react`, same path | Reused          |       100% |
 | `utils/popups/floating-root/useFloatingRootStore.ts`                      | `packages/react`, same path | Rewritten       |        47% |
@@ -500,15 +541,15 @@ Each Solid file is compared with the React file at the same path (`packages/reac
 | `utils/popups/interactions/useHoverPopupInteraction.ts`                   | `packages/react`, same path | Adapted         |        62% |
 | `utils/popups/interactions/useHoverShared.ts`                             | `packages/react`, same path | Reused          |       100% |
 | `utils/popups/interactions/useHoverTriggerInteraction.ts`                 | `packages/react`, same path | Rewritten       |        45% |
-| `utils/popups/interactions/useListNavigation.ts`                          | `packages/react`, same path | Adapted         |        54% |
-| `utils/popups/interactions/useOpenInteractionType.ts`                     | `packages/react`, same path | Rewritten       |        33% |
+| `utils/popups/interactions/useListNavigation.ts`                          | `packages/react`, same path | Adapted         |        52% |
+| `utils/popups/interactions/useOpenInteractionType.ts`                     | `packages/react`, same path | Rewritten       |        45% |
 | `utils/popups/interactions/useTypeahead.ts`                               | `packages/react`, same path | Adapted         |        61% |
 | `utils/popups/popupHandle.ts`                                             | `packages/react`, same path | Reused          |       100% |
 | `utils/popups/popupPositioner.ts`                                         | `packages/react`, same path | Rewritten       |        38% |
-| `utils/popups/popupRoot.tsx`                                              | `packages/react`, same path | Adapted         |        66% |
+| `utils/popups/popupRoot.tsx`                                              | `packages/react`, same path | Adapted         |        51% |
 | `utils/popups/popupStateMapping.ts`                                       | `packages/react`, same path | Reused          |       100% |
-| `utils/popups/popupStoreUtils.ts`                                         | `packages/react`, same path | Adapted         |        54% |
-| `utils/popups/popupTriggerMap.ts`                                         | `packages/react`, same path | Reused          |       100% |
+| `utils/popups/popupStoreUtils.ts`                                         | `packages/react`, same path | Rewritten       |        28% |
+| `utils/popups/popupTriggerMap.ts`                                         | `packages/react`, same path | Lightly adapted |        92% |
 | `utils/popups/portal/FloatingPortal.tsx`                                  | `packages/react`, same path | Adapted         |        53% |
 | `utils/popups/positioning/CommonPositionerCssVars.ts`                     | `packages/react`, same path | Reused          |       100% |
 | `utils/popups/positioning/adaptiveOriginConstants.ts`                     | `packages/react`, same path | Reused          |       100% |
@@ -517,11 +558,11 @@ Each Solid file is compared with the React file at the same path (`packages/reac
 | `utils/popups/positioning/hideMiddleware.ts`                              | `packages/react`, same path | Reused          |       100% |
 | `utils/popups/positioning/useFloating.ts`                                 | `packages/react`, same path | Rewritten       |        16% |
 | `utils/popups/positioning/usePositioner.tsx`                              | `packages/react`, same path | Rewritten       |        39% |
-| `utils/popups/store.ts`                                                   | `packages/react`, same path | Reused          |        98% |
+| `utils/popups/store.ts`                                                   | `packages/react`, same path | Lightly adapted |        84% |
 | `utils/popups/tree/FloatingTree.tsx`                                      | `packages/react`, same path | Adapted         |        50% |
 | `utils/popups/tree/FloatingTreeStore.ts`                                  | `packages/react`, same path | Lightly adapted |        92% |
 | `utils/popups/tree/nodes.ts`                                              | `packages/react`, same path | Lightly adapted |        96% |
-| `utils/popups/types.ts`                                                   | `packages/react`, same path | Adapted         |        79% |
+| `utils/popups/types.ts`                                                   | `packages/react`, same path | Adapted         |        78% |
 | `utils/popups/useAnchoredPopupScrollLock.ts`                              | `packages/react`, same path | Rewritten       |        44% |
 | `utils/popups/usePopupHandleStore.ts`                                     | `packages/react`, same path | Rewritten       |        24% |
 | `utils/popups/useTriggerFocusGuards.ts`                                   | `packages/react`, same path | Adapted         |        75% |

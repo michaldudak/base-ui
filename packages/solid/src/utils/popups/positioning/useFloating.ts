@@ -255,7 +255,17 @@ export function usePosition<RT extends ReferenceType = ReferenceType>(
   const transform = () => access(options.transform) ?? true;
   const open = () => access(options.open);
 
-  const [data, setData] = createSignal<PositionData>(initialData(), { ownedWrite: true });
+  // A writable derived signal: positioning writes it, and closing resets `isPositioned`, so the
+  // next open starts unpositioned. (React resets it from a layout effect that watches `open`.)
+  const [data, setData] = createSignal<PositionData>(
+    (previous) => {
+      const current = previous ?? initialData();
+      return open() === false && current.isPositioned
+        ? { ...current, isPositioned: false }
+        : current;
+    },
+    { ownedWrite: true },
+  );
 
   // Like React's `latestMiddleware` state: a new but deeply equal array keeps the previous one.
   const latestMiddleware = createMemo(() => access(options.middleware) ?? [], {
@@ -334,9 +344,9 @@ export function usePosition<RT extends ReferenceType = ReferenceType>(
     () => [open()] as const,
     ([isOpen]) => {
       openRef.current = isOpen;
+      // `data` resets itself (see its definition); the mirror follows.
       if (isOpen === false && dataRef.current.isPositioned) {
         dataRef.current = { ...dataRef.current, isPositioned: false };
-        setData(dataRef.current);
       }
     },
   );
@@ -403,35 +413,39 @@ export function usePosition<RT extends ReferenceType = ReferenceType>(
     },
   };
 
-  const floatingStyles = createMemo<JSX.CSSProperties>(() => {
-    const position = strategy();
-    const initialStyles: JSX.CSSProperties = {
-      position,
-      left: '0',
-      top: '0',
-    };
-    const floating = floatingEl();
-    if (!floating) {
-      return initialStyles;
-    }
-    const { x: dataX, y: dataY } = data();
-    const x = roundByDPR(floating, dataX);
-    const y = roundByDPR(floating, dataY);
-    if (transform()) {
-      return {
-        ...initialStyles,
-        transform: `translate(${x}px, ${y}px)`,
-        ...(getDPR(floating) >= 1.5 && {
-          'will-change': 'transform',
-        }),
+  const floatingStyles = createMemo<JSX.CSSProperties>(
+    () => {
+      const position = strategy();
+      const initialStyles: JSX.CSSProperties = {
+        position,
+        left: '0',
+        top: '0',
       };
-    }
-    return {
-      position,
-      left: `${x}px`,
-      top: `${y}px`,
-    };
-  });
+      const floating = floatingEl();
+      if (!floating) {
+        return initialStyles;
+      }
+      const { x: dataX, y: dataY } = data();
+      const x = roundByDPR(floating, dataX);
+      const y = roundByDPR(floating, dataY);
+      if (transform()) {
+        return {
+          ...initialStyles,
+          transform: `translate(${x}px, ${y}px)`,
+          ...(getDPR(floating) >= 1.5 && {
+            'will-change': 'transform',
+          }),
+        };
+      }
+      return {
+        position,
+        left: `${x}px`,
+        top: `${y}px`,
+      };
+      // A new object with the same styles is not a change.
+    },
+    { equals: deepEqual },
+  );
 
   onCleanup(() => {
     isMountedRef.current = false;

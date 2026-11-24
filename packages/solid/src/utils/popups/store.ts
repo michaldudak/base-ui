@@ -1,5 +1,5 @@
 import { flush } from 'solid-js';
-import { SolidStore } from '#utils/store';
+import { KEEP, SolidStore } from '#utils/store';
 import { EMPTY_OBJECT } from '#utils/empty';
 import { createEventEmitter } from './createEventEmitter';
 import { dispatchOpenChange } from './floating-root/dispatchOpenChange';
@@ -38,9 +38,12 @@ export type PopupStoreState<Payload> = {
    */
   defaultPopupId: string | undefined;
   /**
-   * Number of trigger elements currently registered for this popup.
+   * The trigger elements registered for this popup, by trigger id. It is replaced, not mutated,
+   * whenever a trigger registers or unregisters, so everything that follows from the set of
+   * triggers (the trigger a popup with a single trigger belongs to, the active trigger's element)
+   * is derived from it by the selectors below.
    */
-  triggerCount: number;
+  triggers: ReadonlyMap<string, Element>;
   /**
    * Whether to prevent unmounting the popup when closed.
    * Useful for interacting with JS animation libraries that control unmounting themselves.
@@ -53,11 +56,15 @@ export type PopupStoreState<Payload> = {
   payload: Payload | undefined;
 
   /**
-   * ID of the currently active trigger.
+   * ID of the trigger an open request named, or that the popup was last resolved to.
+   * Read the active trigger through the `activeTriggerId` selector: while this is `null`, a popup
+   * with a single trigger belongs to that trigger.
    */
   activeTriggerId: string | null;
   /**
-   * The currently active trigger DOM element.
+   * The element of the trigger an open request named, or that the popup was last resolved to.
+   * Read the active trigger through the `activeTriggerElement` selector, which prefers the element
+   * registered under the active trigger id.
    */
   activeTriggerElement: Element | null;
   /**
@@ -70,7 +77,7 @@ export type PopupStoreState<Payload> = {
    * Whether the popup is open because of a request that deliberately carried no trigger, such as a
    * handle's `open(null)` or `openWithPayload()`. While set, a lone registered trigger is not
    * implicitly associated with the popup, so its trigger-owned state (such as `payload`) is not
-   * forwarded. Reset by the Root once the popup is effectively closed.
+   * forwarded. Reset once the popup has unmounted.
    */
   openedWithoutTrigger: boolean;
   /**
@@ -109,6 +116,8 @@ export type PopupStoreState<Payload> = {
   popupProps: HTMLProps;
 };
 
+const EMPTY_TRIGGERS: ReadonlyMap<string, Element> = new Map();
+
 export function createInitialPopupStoreState<Payload>(
   defaultPopupId?: string | undefined,
 ): PopupStoreState<Payload> {
@@ -118,7 +127,7 @@ export function createInitialPopupStoreState<Payload>(
     mounted: false,
     transitionStatus: undefined,
     defaultPopupId,
-    triggerCount: 0,
+    triggers: EMPTY_TRIGGERS,
     preventUnmountingOnClose: false,
     payload: undefined,
     activeTriggerId: null,
@@ -161,6 +170,15 @@ export type PopupStoreContext<ChangeEventDetails> = PopupInteractionContext & {
    * Whether the popup has a parent in the floating tree.
    */
   nested: boolean;
+  /**
+   * What each registered trigger forwards to the popup while the popup belongs to it, by trigger
+   * id. See `useActiveTriggerData`.
+   */
+  readonly triggerData: Map<string, () => object>;
+  /**
+   * Called when the trigger an open popup belongs to unregisters.
+   */
+  onActiveTriggerUnregistered?: ((triggerId: string) => void) | undefined;
 };
 
 /**
@@ -170,6 +188,7 @@ export function createPopupStoreContext() {
   return {
     popupRef: { current: null as HTMLElement | null },
     triggerElements: new PopupTriggerMap(),
+    triggerData: new Map<string, () => object>(),
     onOpenChange: undefined,
     onOpenChangeComplete: undefined,
     events: createEventEmitter(),
@@ -179,15 +198,97 @@ export function createPopupStoreContext() {
 
 type S = PopupStoreState<unknown>;
 
-const activeTriggerIdSelector = (state: S) => state.triggerIdProp ?? state.activeTriggerId;
-
 const openSelector = (state: S) => state.openProp ?? state.open;
 
-const activeTriggerElementSelector = (state: S) =>
-  state.mounted ? state.activeTriggerElement : null;
+/**
+ * The id of the trigger a popup belongs to when no open request and no prop names one: its only
+ * registered trigger. A popup opened deliberately without a trigger stays unassociated.
+ */
+function implicitTriggerIdSelector(state: S): string | null {
+  if (
+    state.triggers.size !== 1 ||
+    state.openedWithoutTrigger ||
+    !(openSelector(state) || state.mounted)
+  ) {
+    return null;
+  }
+  const [triggerId] = state.triggers.keys();
+  return triggerId;
+}
 
+/**
+ * The active trigger id as far as the store's own state goes, before the `triggerId` prop.
+ */
+function ownActiveTriggerIdSelector(state: S): string | null {
+  const triggerId = state.activeTriggerId;
+  if (triggerId == null) {
+    return implicitTriggerIdSelector(state);
+  }
+
+  // An open request names its trigger by the element's own `id`, which can differ from the id the
+  // trigger registered under. The element tells which registered trigger was meant.
+  const element = state.activeTriggerElement;
+  if (element !== null && !state.triggers.has(triggerId)) {
+    for (const [registeredId, registeredElement] of state.triggers) {
+      if (registeredElement === element) {
+        return registeredId;
+      }
+    }
+  }
+
+  return triggerId;
+}
+
+const activeTriggerIdSelector = (state: S) =>
+  state.triggerIdProp ?? ownActiveTriggerIdSelector(state);
+
+/**
+ * The active trigger's element, whether or not the popup is mounted: the element registered under
+ * the active trigger id, or the one last seen for it once the trigger has unregistered.
+ */
+function lastActiveTriggerElementSelector(state: S): Element | null {
+  const triggerId = activeTriggerIdSelector(state);
+  return (
+    (triggerId != null ? state.triggers.get(triggerId) : undefined) ?? state.activeTriggerElement
+  );
+}
+
+const activeTriggerElementSelector = (state: S) =>
+  state.mounted ? lastActiveTriggerElementSelector(state) : null;
+
+/**
+ * Runs when the registered triggers change. The active trigger the selectors resolved from the
+ * previous triggers is written into the state, so that it stays: a popup keeps the trigger it
+ * opened from when a second trigger registers, and keeps its element when it unregisters.
+ */
+function keepResolvedActiveTrigger<State extends S>(previous: State, next: State): State {
+  if (
+    next.triggers === previous.triggers ||
+    // The same update names another trigger.
+    next.activeTriggerId !== previous.activeTriggerId ||
+    !(openSelector(next) || next.mounted)
+  ) {
+    return next;
+  }
+
+  const triggerId = ownActiveTriggerIdSelector(previous);
+  if (triggerId == null) {
+    return next;
+  }
+
+  const element = lastActiveTriggerElementSelector(previous);
+  if (triggerId === next.activeTriggerId && element === next.activeTriggerElement) {
+    return next;
+  }
+
+  return { ...next, activeTriggerId: triggerId, activeTriggerElement: element };
+}
+
+// Solid port: React reads the element's `id` first. An attribute is not reactive, so a selector
+// that reads it can keep a stale id; the Root's `defaultPopupId` already follows an id the popup
+// renders itself (see `renderedPopupId` in `MenuRoot`), so it comes first here.
 const popupIdSelector = (state: S) => {
-  const popupId = state.popupElement?.id ?? state.defaultPopupId;
+  const popupId = state.defaultPopupId ?? state.popupElement?.id;
   return popupId || undefined;
 };
 
@@ -207,7 +308,7 @@ function triggerOwnsOpenPopupOrIsOnlyTrigger(state: S, triggerId: string | undef
     openSelector(state) &&
     activeTriggerIdSelector(state) == null &&
     !state.openedWithoutTrigger &&
-    state.triggerCount === 1
+    state.triggers.size === 1
   );
 }
 
@@ -218,12 +319,16 @@ export const popupStoreSelectors = {
   // layout effect. Match useTransitionStatus so a retained popup does not miss its starting phase.
   transitionStatus: (state: S) =>
     openSelector(state) && !state.mounted ? 'starting' : state.transitionStatus,
-  triggerCount: (state: S) => state.triggerCount,
+  triggerCount: (state: S) => state.triggers.size,
   preventUnmountingOnClose: (state: S) => state.preventUnmountingOnClose,
   payload: (state: S) => state.payload,
 
   activeTriggerId: activeTriggerIdSelector,
   activeTriggerElement: activeTriggerElementSelector,
+  /**
+   * The active trigger's element, also while the popup is not mounted.
+   */
+  lastActiveTriggerElement: lastActiveTriggerElementSelector,
   popupId: popupIdSelector,
   /**
    * Whether the trigger with the given ID was used to open the popup.
@@ -258,7 +363,7 @@ export const popupStoreSelectors = {
 
   // Reads of the interaction hooks' store (`PopupInteractionStore`).
   defaultPopupId: (state: S) => state.defaultPopupId,
-  anchorElement: (state: S) => state.anchorElement,
+  anchorElement: (state: S) => activeTriggerElementSelector(state) ?? state.anchorElement,
   anchor: (state: S) => state.anchorOverride ?? activeTriggerElementSelector(state),
 };
 
@@ -280,7 +385,7 @@ function syncAnchorState<State extends S>(previous: State, next: State): State {
 
   return {
     ...next,
-    anchorElement: nextAnchor ?? next.anchorElement,
+    anchorElement: nextAnchor ?? previousAnchor ?? next.anchorElement,
     anchorOverride: followsAnchor ? nextAnchor : next.anchorOverride,
   };
 }
@@ -310,12 +415,12 @@ export function createPopupOpenState(
   // A controlled `triggerId` can move the popup to another trigger without updating the stored id,
   // so the kept id is the one the popup currently resolves.
   let activeTriggerId = activeTriggerIdSelector(state);
-  let activeTriggerElement = state.activeTriggerElement;
+  let activeTriggerElement = lastActiveTriggerElementSelector(state);
 
   // A close keeps the active trigger when it names no trigger or names the active one, so exit
   // animations play and focus returns to it. The active id can differ from the element's own `id`
   // once the Root matches the element to its registered trigger id.
-  if (open || (triggerId && trigger !== state.activeTriggerElement)) {
+  if (open || (triggerId && trigger !== activeTriggerElement)) {
     activeTriggerId = triggerId;
     activeTriggerElement = trigger ?? null;
   }
@@ -357,7 +462,11 @@ export type PopupUnmountState<State extends PopupStoreState<unknown>> = Partial<
 >;
 
 type PopupUnmountKey =
-  'activeTriggerId' | 'activeTriggerElement' | 'mounted' | 'preventUnmountingOnClose';
+  | 'activeTriggerId'
+  | 'activeTriggerElement'
+  | 'openedWithoutTrigger'
+  | 'mounted'
+  | 'preventUnmountingOnClose';
 
 /**
  * The store of a popup Root. It holds the state every popup shares and runs every open change in
@@ -402,9 +511,9 @@ export abstract class BasePopupStore<
     if (!openSelector(this.state) && openSelector(newState)) {
       this.openSession = {};
     }
-    super.setState(
-      this.anchorsToActiveTrigger() ? syncAnchorState(this.state, newState) : newState,
-    );
+    const previous = this.state;
+    const next = keepResolvedActiveTrigger(previous, newState);
+    super.setState(this.anchorsToActiveTrigger() ? syncAnchorState(previous, next) : next);
   }
 
   /**
@@ -416,11 +525,14 @@ export abstract class BasePopupStore<
   }
 
   /**
-   * Clears the anchor element and the anchor override. The trigger and positioner elements come
-   * from the popup's own state, so they stay.
+   * Clears the anchor element and the anchor override while the popup isn't mounted, for as long
+   * as the current owner (the positioner) lives. The trigger and positioner elements come from
+   * the popup's own state, so they stay.
    */
-  clearPositioning() {
-    this.update({ anchorElement: null, anchorOverride: null });
+  useClearedPositioning(mounted: () => boolean) {
+    const store = this as unknown as SolidStore<PopupStoreState<unknown>>;
+    store.useDerivedValue('anchorElement', () => (mounted() ? KEEP : null));
+    store.useDerivedValue('anchorOverride', () => (mounted() ? KEEP : null));
   }
 
   setOpen = (
@@ -550,6 +662,7 @@ export abstract class BasePopupStore<
     if (!this.state.open) {
       unmountState.activeTriggerId = null;
       unmountState.activeTriggerElement = null;
+      unmountState.openedWithoutTrigger = false;
     }
     this.update({ ...this.prepareUnmount(), ...unmountState } as Pick<State, keyof State>);
   }

@@ -1,5 +1,5 @@
 import { expect, vi, describe, beforeEach, it, afterEach } from 'vitest';
-import { For, Show, createSignal, flush, omit } from 'solid-js';
+import { For, Show, createEffect, createRoot, createSignal, flush, omit } from 'solid-js';
 import type { Component, ParentProps } from 'solid-js';
 import type { JSX } from '@solidjs/web';
 import {
@@ -17,6 +17,7 @@ import { Menu } from '@base-ui/solid/menu';
 import { platform } from '#utils/platform';
 import userEvent from '@testing-library/user-event';
 import {
+  allowSolidDiagnostics,
   createRenderer,
   enterWithMouse,
   isJSDOM,
@@ -90,6 +91,8 @@ describe('<Menu.Root />', () => {
     });
 
     it('unmounts the popup when a layout effect closes it right after a press opens it', async () => {
+      // Solid port: the fixture's effect writes the state it depends on, on purpose.
+      allowSolidDiagnostics('EFFECT_WRITES_OWN_SOURCE', 'EFFECT_RELAY_TEAR');
       const onOpenChangeComplete = vi.fn();
 
       function App() {
@@ -3581,6 +3584,8 @@ describe('<Menu.Root />', () => {
 
   describe('prop: onOpenChangeComplete', () => {
     it('completes initial opening once when a later update replaces the container ref', async () => {
+      // Solid port: the fixture's effect writes the state it depends on, on purpose.
+      allowSolidDiagnostics('EFFECT_WRITES_OWN_SOURCE', 'EFFECT_RELAY_TEAR');
       const completed = vi.fn();
 
       function TestMenu() {
@@ -4153,11 +4158,14 @@ describe('<Menu.Root />', () => {
       return activeSubscriptions() - baseline;
     }
 
-    it('releases the subscriptions a submenu adds to its parent store when it unmounts', async () => {
+    // Solid port: skipped. A submenu's store no longer subscribes to its parent's store: its
+    // selectors read the parent's state reactively (`store.selectFor`), and Solid releases those
+    // dependencies with the submenu's owner. There is no subscription left to count.
+    it.skip('releases the subscriptions a submenu adds to its parent store when it unmounts', async () => {
       expect(await leakedSubscriptionsAfterSubmenuUnmount(false)).toBe(0);
     });
 
-    it('releases them under StrictMode', async () => {
+    it.skip('releases them under StrictMode', async () => {
       expect(await leakedSubscriptionsAfterSubmenuUnmount(true)).toBe(0);
     });
 
@@ -4178,14 +4186,29 @@ describe('<Menu.Root />', () => {
         </StrictModeStandIn>
       ));
 
+      // Solid port: the React test subscribes to the submenu's store and writes the parent's
+      // `rootId`. Here the submenu follows its parent through reactive reads, so the equivalent
+      // is an accessor of the submenu's store updating. `rootId` is derived from a prop in this
+      // port and can't be written, so the test writes `keyboardEventRelay`, which a submenu
+      // also takes from its parent.
       const submenuListener = vi.fn();
-      const unsubscribe = submenuStore!.subscribe(submenuListener);
-      await act(async () => {
-        parentStore!.set('rootId', 'next-root-id');
+      const dispose = createRoot((disposeRoot) => {
+        const relay = submenuStore!.useState('keyboardEventRelay');
+        createEffect(relay, (value) => {
+          submenuListener(value);
+        });
+        return disposeRoot;
       });
-      unsubscribe();
+      flush();
+      expect(submenuListener).toHaveBeenLastCalledWith(undefined);
 
-      expect(submenuListener).toHaveBeenCalled();
+      const nextRelay = () => {};
+      await act(async () => {
+        parentStore!.set('keyboardEventRelay', nextRelay);
+      });
+      dispose();
+
+      expect(submenuListener).toHaveBeenLastCalledWith(nextRelay);
     });
   });
 

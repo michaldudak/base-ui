@@ -1,6 +1,6 @@
 import { access } from '#utils/access';
 import type { MaybeAccessor } from '#utils/access';
-import { useEffect } from '#utils/useEffect';
+import { useExternalEffect } from '#utils/useEffect';
 import { useAnimationsFinished } from './useAnimationsFinished';
 
 /**
@@ -17,7 +17,9 @@ export function useOpenChangeComplete(parameters: UseOpenChangeCompleteParameter
     parameters.batch ?? false,
   );
 
-  useEffect(
+  // Waits for the element's animations, which are outside the reactive graph, and `onComplete`
+  // usually writes state (the popup unmounts).
+  useExternalEffect(
     () =>
       [
         access(parameters.enabled) ?? true,

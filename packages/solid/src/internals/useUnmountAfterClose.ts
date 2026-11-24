@@ -1,4 +1,4 @@
-import { createMemo, createSignal, untrack } from 'solid-js';
+import { createMemo, createSignal, flush, untrack } from 'solid-js';
 import { access } from '#utils/access';
 import type { MaybeAccessor } from '#utils/access';
 import { useEffect, useIsoLayoutEffect } from '#utils/useEffect';
@@ -87,12 +87,6 @@ export function useUnmountAfterClose(parameters: UseUnmountAfterCloseParameters)
   // inside an effect, where reading the `open` accessor isn't allowed, so they read this mirror,
   // which matches the `open` React rendered last.
   const openRef = { current: untrack(open) };
-  // A `forceUnmount()` call while open is decided once its request has been applied. Other
-  // updates in the same batch can apply first, before the batch's own state (a controlled `open`
-  // prop) has landed.
-  const [unmountRequest, setUnmountRequest] = createSignal(0, { ownedWrite: true });
-  const unmountRequestRef = { current: 0 };
-  const pendingUnmountRef: { current: number | null } = { current: null };
   // Bumped by every `unmount()`, so the effect below resyncs `mountedRef` afterwards.
   const [unmountCount, setUnmountCount] = createSignal(0, { ownedWrite: true });
 
@@ -103,17 +97,12 @@ export function useUnmountAfterClose(parameters: UseUnmountAfterCloseParameters)
     parameters.onUnmount();
   };
 
+  // Only keeps the mirrors current. It writes no state.
   useIsoLayoutEffect(
-    () => [mounted(), unmountRequest(), open(), unmountCount()] as const,
-    ([isMounted, request, isOpen]) => {
+    () => [mounted(), open(), unmountCount()] as const,
+    ([isMounted, isOpen]) => {
       mountedRef.current = isMounted;
       openRef.current = isOpen;
-      if (pendingUnmountRef.current !== null && pendingUnmountRef.current <= request) {
-        pendingUnmountRef.current = null;
-        if (!isOpen && isMounted) {
-          unmount();
-        }
-      }
     },
   );
 
@@ -123,26 +112,37 @@ export function useUnmountAfterClose(parameters: UseUnmountAfterCloseParameters)
     }
     if (openRef.current) {
       // The rendered `open` can't tell a stale exit-animation callback after a quick reopen from a
-      // close batched with this call (`close(); unmount()`). Decide once the batch commits: unmount
-      // if the popup closed, otherwise drop the call rather than run the host's unmount cleanup and
-      // the close completion against a live popup.
-      unmountRequestRef.current += 1;
-      pendingUnmountRef.current = unmountRequestRef.current;
-      setUnmountRequest(unmountRequestRef.current);
+      // close batched with this call (`close(); unmount()`). Decide once the batch has been
+      // applied: unmount if the popup closed, otherwise drop the call rather than run the host's
+      // unmount cleanup and the close completion against a live popup.
+      queueMicrotask(() => {
+        flush();
+        if (!openRef.current && mountedRef.current) {
+          unmount();
+        }
+      });
       return;
     }
     unmount();
   };
 
-  const waitsForClose = createMemo(() => mounted() && !open() && !preventUnmountingOnClose());
+  // Whether the popup is closed and due to unmount. `mounted` is left out on purpose: the wait
+  // below ends by writing it, and an effect must not depend on what it writes. A popup that is
+  // already unmounted is told apart where the wait completes.
+  const closing = createMemo(() => !open() && !preventUnmountingOnClose());
 
   // The portal renders the popup a few commits after it mounts. A close within that window starts
   // waiting before the element exists, so the wait restarts once it attaches.
   const [attachCount, setAttachCount] = createSignal(0, { ownedWrite: true });
   useEffect(
-    () => [waitsForClose()] as const,
-    ([waits]) => {
-      if (!waits || parameters.ref.current != null || !parameters.subscribeToAttach) {
+    () => [closing()] as const,
+    ([isClosing]) => {
+      if (
+        !isClosing ||
+        !mountedRef.current ||
+        parameters.ref.current != null ||
+        !parameters.subscribeToAttach
+      ) {
         return undefined;
       }
       const unsubscribe = parameters.subscribeToAttach(() => {
@@ -156,15 +156,13 @@ export function useUnmountAfterClose(parameters: UseUnmountAfterCloseParameters)
   );
 
   useOpenChangeComplete({
-    enabled: waitsForClose,
+    enabled: closing,
     open,
     ref: parameters.ref,
     restartKey: attachCount,
-    onComplete() {
-      if (!openRef.current) {
-        forceUnmount();
-      }
-    },
+    // The wait only runs while the popup is closed, but it can complete in the pass where the
+    // popup closed, before the mirrors above are current. `forceUnmount` sorts that out.
+    onComplete: forceUnmount,
   });
 
   return { mounted, transitionStatus, preventUnmountingOnClose, forceUnmount };

@@ -153,7 +153,9 @@ export function useDismiss(
   const tree = useFloatingTree(props.externalTree);
   const getOutsidePressEventProp = () => props.outsidePressEvent ?? 'sloppy';
 
-  const normalizedBubbles = createMemo(() => normalizeProp(access(props.bubbles)));
+  const normalizedBubbles = createMemo(() => normalizeProp(access(props.bubbles)), {
+    equals: (a, b) => a.escapeKey === b.escapeKey && a.outsidePress === b.outsidePress,
+  });
 
   const pressStartedInsideRef = { current: false };
   const pressStartPreventedRef = { current: false };

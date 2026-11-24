@@ -76,48 +76,16 @@ function MenuSubmenuTriggerPlain(componentProps: MenuSubmenuTriggerPlainProps): 
   const floatingTreeRoot = store.useState('floatingTreeRoot');
   const popupId = store.useState('triggerPopupId', thisTriggerId);
 
-  // Solid port: the registration also runs from an effect, where accessors can't be read, so it
-  // reads the id from a variable that the effect below keeps current (initial value read once).
-  let currentTriggerId: string | undefined = untrack(thisTriggerId);
-  const baseRegisterTrigger = useTriggerRegistration(() => currentTriggerId, store);
-
-  // Stable, so the merged ref on the rendered element keeps its identity for the trigger's whole
-  // lifetime; the latest `closeDelay` is read from the store, which the prop is synced to.
-  const registerTrigger = (element: Element | null) => {
-    baseRegisterTrigger(element);
-
-    const activeTriggerElement = store.select('activeTriggerElement');
-    if (
-      element !== null &&
-      store.select('open') &&
-      (activeTriggerElement === element || store.select('activeTriggerId') == null)
-    ) {
-      store.update({
-        activeTriggerId: currentTriggerId ?? null,
-        activeTriggerElement: element,
-        closeDelay: store.state.closeDelay,
-      });
-    }
-  };
+  // A submenu has one trigger, so its menu belongs to it without being told (see the
+  // `activeTriggerId` selector).
+  const registerTrigger = useTriggerRegistration(thisTriggerId, store);
 
   const triggerElementRef: { current: HTMLElement | null } = { current: null };
 
   const handleTriggerElementRef = (el: HTMLElement | null) => {
     triggerElementRef.current = el;
-    store.set('activeTriggerElement', el);
   };
   onCleanup(() => handleTriggerElementRef(null));
-
-  // A stable ref does not re-fire when the id changes, so register the rendered element here
-  // instead.
-  useIsoLayoutEffect(
-    () => [thisTriggerId()] as const,
-    ([triggerId]) => {
-      currentTriggerId = triggerId;
-      registerTrigger(triggerElementRef.current);
-      return () => registerTrigger(null);
-    },
-  );
 
   useIsoLayoutEffect(
     () => [open(), positionerElement()] as const,
@@ -260,10 +228,29 @@ function MenuSubmenuTriggerPlain(componentProps: MenuSubmenuTriggerPlainProps): 
     }
   };
 
-  const onBlur = () => {
-    if (highlighted()) {
+  const clearHighlight = () => {
+    if (parentMenuStore.select('activeIndex') === listItem.index()) {
       parentMenuStore.setActiveIndex(null, REASONS.none);
     }
+  };
+
+  const onBlur = (event: FocusEvent) => {
+    if (!highlighted()) {
+      return;
+    }
+
+    // A filtered submenu hands focus straight back to its input when the parent's list
+    // navigation focuses this trigger (see `useMenuFilterSubmenuTrigger`). That blur arrives
+    // while the effect that focused the trigger is still running, so the highlight is cleared
+    // once it is done rather than in the middle of it: state written while effects run makes
+    // them all run a second time.
+    const focusOwner = store.context.virtualFocusRef?.current;
+    if (focusOwner != null && event.relatedTarget === focusOwner) {
+      queueMicrotask(clearHighlight);
+      return;
+    }
+
+    parentMenuStore.setActiveIndex(null, REASONS.none);
   };
 
   return useRenderElement('div', componentProps, {

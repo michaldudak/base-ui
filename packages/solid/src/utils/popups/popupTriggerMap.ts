@@ -28,6 +28,9 @@ function getDevElementIds(map: PopupTriggerMap) {
 export class PopupTriggerMap {
   private idMap: Map<string, Element> = new Map();
 
+  // The copy `snapshot()` last returned, until the map changes.
+  private lastSnapshot: ReadonlyMap<string, Element> | undefined = new Map();
+
   /**
    * Adds a trigger element with the given ID.
    *
@@ -56,7 +59,10 @@ export class PopupTriggerMap {
       elementIds.set(element, id);
     }
 
-    this.idMap.set(id, element);
+    if (this.idMap.get(id) !== element) {
+      this.idMap.set(id, element);
+      this.lastSnapshot = undefined;
+    }
   }
 
   /**
@@ -70,7 +76,18 @@ export class PopupTriggerMap {
       }
     }
 
-    this.idMap.delete(id);
+    if (this.idMap.delete(id)) {
+      this.lastSnapshot = undefined;
+    }
+  }
+
+  /**
+   * Returns an immutable copy of the registered triggers. The same copy is returned until the map
+   * changes, so many triggers registering together share one.
+   */
+  public snapshot(): ReadonlyMap<string, Element> {
+    this.lastSnapshot ??= new Map(this.idMap);
+    return this.lastSnapshot;
   }
 
   /**

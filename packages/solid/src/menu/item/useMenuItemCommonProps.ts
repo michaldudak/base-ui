@@ -71,11 +71,9 @@ export function useMenuItemCommonProps(
     return isSubmenuTrigger && parent.type === 'menu' ? parent.store : rootContext.store;
   });
   // Solid port: the store a selector reads from can change, so the selector is read through
-  // `track()` + `select()` instead of a `useState` accessor bound to one store.
+  // `selectTracked()` instead of a `useState` accessor bound to one store.
   const ariaSelected = createMemo(() => {
-    const currentStore = selectionStore();
-    currentStore.track();
-    return currentStore.select('webkitAriaSelected', access(params.highlighted));
+    return selectionStore().selectTracked('webkitAriaSelected', access(params.highlighted));
   });
 
   const highlightedWhileOpen = store.useState('highlightedWhileOpen', () =>

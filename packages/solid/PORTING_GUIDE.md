@@ -135,7 +135,14 @@ not values.
 
 ### 3.3 Effects
 
-Use `useEffect` / `useIsoLayoutEffect` from `#utils/useEffect`:
+**First decide whether it should be an effect at all.** An effect is for talking to something
+outside the reactive graph: the DOM (focus, measuring, listeners), timers and animations, a
+registry, an event bus. A React effect that only computes state from other state must not be
+ported as an effect; see section 4.1. Solid's dev build reports the ones that slip through
+(`EFFECT_RELAY_TEAR`, `EFFECT_WRITES_OWN_SOURCE`), and the test setup fails on them.
+
+Use `useExternalEffect` (or `useEffect` / `useIsoLayoutEffect`, which are the same thing with the
+values passed as an argument) from `#utils/useEffect`:
 
 ```ts
 // React
@@ -175,6 +182,14 @@ Rules:
   and passive effects are not separate phases. If React code relies on a child's layout effect
   having run before the parent's effect (typically registration of items), do the child's work
   synchronously in the component body or in its `ref` callback instead, and note it in a comment.
+- Effects of the **same component do not run in declaration order** either: they run as their
+  dependencies settle. Never let one effect rely on another having run first. In particular the
+  React idiom of a last effect that stores the previous value in a ref does not work; the effect
+  callback receives the previous values of its dependencies as its second argument.
+- An effect's dependencies must not include what the effect writes, directly or through a memo.
+  If it needs the current value, read it untracked or from the store (`store.select`).
+- DOM calls in an effect (`focus()`) run event handlers synchronously. A state write in such a
+  handler counts as the effect's write.
 - React StrictMode double-invocation does not exist; delete code that only exists for it.
 
 ### 3.4 Refs to elements
@@ -248,6 +263,43 @@ plus accessors.
 - Selectors (`createSelector`, `createSelectorMemoized`) and store classes are copied verbatim;
   only the base class changes from `ReactStore` to `SolidStore`. Methods of store classes that
   are React hooks (`useX`) are ported with the rules of section 3.
+
+### 4.1 State that depends on other state
+
+React Base UI often keeps such state in sync with effects. Here it is derived. Pick the first
+shape that fits:
+
+1. **A selector or memo.** If the value is a function of other state, compute it:
+   `activeTriggerElement` is a selector over `triggers`, `activeTriggerId` and `mounted`.
+2. **A derived key.** If parts read the value from the store but it comes from a prop or a memo,
+   give the key a source: `store.useSyncedValue('orientation', () => props.orientation)`. Nothing is
+   copied; readers of the key depend on the accessor. Such a key can't be written.
+3. **A writable derived key.** If the value is ordinary state that must reset or follow something
+   else, describe the rule and keep the key writable:
+
+   ```ts
+   import { KEEP } from '#utils/store';
+
+   // React: useEffect(() => { if (!open) store.set('hoverEnabled', true); }, [open]);
+   store.useDerivedValue('hoverEnabled', () => (open() ? KEEP : true));
+
+   // Follows the active trigger; a handle can still set it while no trigger is active.
+   store.useDerivedValue('payload', () => {
+     const data = triggerData();
+     return data ? data.payload : KEEP;
+   });
+   ```
+
+   The function receives the current value and returns the new one, or `KEEP`. It runs again when
+   something it reads changes; a `set()` in between stays until then. Several rules for one key
+   are applied in the order they were added. For local state the same thing is
+   `createSignal((previous) => ...)`.
+
+4. **Write it where the change happens.** If an event handler knows the outcome, write all of it
+   in the handler (`setOpen` also writes the trigger and the reason) instead of reacting later.
+
+Memos that return objects (`styles`, prop bags from changing inputs) need an `equals` option when
+the same content can be produced again, or every reader re-runs (`UNSTABLE_MEMO_OUTPUT`).
 
 ## 5. Rendering elements
 

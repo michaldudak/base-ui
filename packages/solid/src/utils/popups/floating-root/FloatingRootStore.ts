@@ -1,4 +1,4 @@
-import { SolidStore } from '#utils/store';
+import { KEEP, SolidStore } from '#utils/store';
 import type { PopupInteractionContext, PositioningInteractionStore, ReferenceType } from '../types';
 import type { BaseUIChangeEventDetails } from '../../../internals/createBaseUIEventDetails';
 import { createEventEmitter } from '../createEventEmitter';
@@ -110,11 +110,9 @@ export class FloatingRootStore
    * Forgets the anchor and elements positioning reads while the popup isn't mounted, so
    * positioning doesn't run for a `keepMounted` popup that is closed.
    */
-  clearPositioning() {
-    this.update({
-      positionerElement: null,
-      anchorElement: null,
-      anchorOverride: null,
-    });
+  useClearedPositioning(mounted: () => boolean) {
+    this.useDerivedValue('positionerElement', () => (mounted() ? KEEP : null));
+    this.useDerivedValue('anchorElement', () => (mounted() ? KEEP : null));
+    this.useDerivedValue('anchorOverride', () => (mounted() ? KEEP : null));
   }
 }
