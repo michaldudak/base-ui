@@ -20,3 +20,9 @@ All entries are in `menu/filter-root/MenuFilterRoot.test.tsx`.
 
 - `MenuFilterRoot.test.tsx`, "does not repeat matching when navigating past hidden component labels": React passes the content as `{() => (<>...</>)}`. In the Solid port a payload render function must declare its parameter (the rule Solid's own `<Show>` uses), because a lone component child can itself arrive as a zero-argument accessor. The payload is unused, so the content is passed directly.
 - `MenuFilterRoot.webkit.test.tsx`, `Test` helper: the input also gets a `ref` that focuses it when `autoFocus` is set. React DOM focuses `autoFocus` elements on mount; Solid does not.
+
+## Skipped: no Solid equivalent
+
+- **Text of an item that changes while it is filtered out** (3 tests): `useMenuFilterItem.test.tsx` "matches the new children of an item that changed while it was filtered out", "matches a render element whose text changed while the item was filtered out"; `MenuFilterRoot.test.tsx` "re-filters an item whose rendered text changes while it is hidden". React reads an unrendered item's text from its element tree. Solid children are getters that create DOM when read, so a hidden item keeps the text it last rendered. Workaround: the item's `label` prop.
+- **Props read from a `render` element** (3 tests): `MenuFilterRoot.test.tsx` "uses an explicit label from the popup render element", "keeps a list label supplied through a render element", "omits aria-controls when the list renders with an explicitly empty id". The Solid `render` prop has no element form, and a render function's output cannot be inspected.
+- **`Menu.Viewport`** (1 test): `MenuFilterRoot.test.tsx` "with a Viewport > keeps real focus on the input while the cursor moves through the list". Not ported.

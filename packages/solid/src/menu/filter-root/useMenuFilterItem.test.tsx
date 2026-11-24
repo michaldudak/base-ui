@@ -215,7 +215,10 @@ describe('filtered Menu items', () => {
       expect(screen.queryByRole('menuitem', { name: 'Usuń' })).toBe(null);
     });
 
-    it('matches the new children of an item that changed while it was filtered out', async () => {
+    // Solid port, skipped: a filtered-out item is not rendered, and Solid children cannot be inspected without
+    // rendering them (React reads the text from the element tree). A hidden item keeps the text it last
+    // rendered; pass `label` to an item whose text changes while hidden. See test-changes/filter-root.md.
+    it.skip('matches the new children of an item that changed while it was filtered out', async () => {
       function Test(props: { value: string; label: string }) {
         return (
           <Menu.FilterProvider value={props.value}>
@@ -276,7 +279,10 @@ describe('filtered Menu items', () => {
       expect(screen.getByRole('menuitem', { name: 'Two' })).toBeVisible();
     });
 
-    it('matches a render element whose text changed while the item was filtered out', async () => {
+    // Solid port, skipped: a filtered-out item is not rendered, and Solid children cannot be inspected without
+    // rendering them (React reads the text from the element tree). A hidden item keeps the text it last
+    // rendered; pass `label` to an item whose text changes while hidden. See test-changes/filter-root.md.
+    it.skip('matches a render element whose text changed while the item was filtered out', async () => {
       function Test(props: { value: string; name: string }) {
         return (
           <Menu.FilterProvider value={props.value}>

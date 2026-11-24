@@ -2161,7 +2161,9 @@ describe('<Menu.FilterProvider><Menu.Root/></Menu.FilterProvider>', () => {
       expect(popup).not.toHaveAttribute('aria-labelledby');
     });
 
-    it('uses an explicit label from the popup render element', async () => {
+    // Solid port, skipped: React reads this prop from the `render` element. The Solid `render` prop is a function or a
+    // component, whose output the part cannot inspect; set the prop on the part itself.
+    it.skip('uses an explicit label from the popup render element', async () => {
       const { user } = await render(() => (
         <Menu.FilterProvider>
           <Menu.Root>
@@ -4180,7 +4182,10 @@ describe('<Menu.FilterProvider><Menu.Root/></Menu.FilterProvider>', () => {
     expect(screen.getByText('Empty section')).toBeVisible();
   });
 
-  it('re-filters an item whose rendered text changes while it is hidden', async () => {
+  // Solid port, skipped: a filtered-out item is not rendered, and Solid children cannot be inspected without
+  // rendering them (React reads the text from the element tree). A hidden item keeps the text it last
+  // rendered; pass `label` to an item whose text changes while hidden. See test-changes/filter-root.md.
+  it.skip('re-filters an item whose rendered text changes while it is hidden', async () => {
     function App() {
       const [label, setLabel] = createSignal('Archive');
       return (
@@ -5355,7 +5360,9 @@ describe('<Menu.FilterProvider><Menu.Root/></Menu.FilterProvider>', () => {
       expect(screen.getByRole('menu')).toHaveAttribute('aria-labelledby', trigger.id);
     });
 
-    it('keeps a list label supplied through a render element', async () => {
+    // Solid port, skipped: React reads this prop from the `render` element. The Solid `render` prop is a function or a
+    // component, whose output the part cannot inspect; set the prop on the part itself.
+    it.skip('keeps a list label supplied through a render element', async () => {
       await render(() => (
         <Menu.FilterProvider>
           <Menu.Root defaultOpen>
@@ -5379,7 +5386,9 @@ describe('<Menu.FilterProvider><Menu.Root/></Menu.FilterProvider>', () => {
       expect(list).not.toHaveAttribute('aria-labelledby');
     });
 
-    it('omits aria-controls when the list renders with an explicitly empty id', async () => {
+    // Solid port, skipped: React reads this prop from the `render` element. The Solid `render` prop is a function or a
+    // component, whose output the part cannot inspect; set the prop on the part itself.
+    it.skip('omits aria-controls when the list renders with an explicitly empty id', async () => {
       await render(() => (
         <Menu.FilterProvider>
           <Menu.Root defaultOpen>
@@ -6209,7 +6218,8 @@ describe('<Menu.FilterProvider><Menu.Root/></Menu.FilterProvider>', () => {
   });
 
   describe('with a Viewport', () => {
-    it('keeps real focus on the input while the cursor moves through the list', async () => {
+    // Solid port, skipped: `Menu.Viewport` is outside the scope of the proof of concept.
+    it.skip('keeps real focus on the input while the cursor moves through the list', async () => {
       const { user } = await render(() => (
         <Menu.FilterProvider>
           <Menu.Root defaultOpen>

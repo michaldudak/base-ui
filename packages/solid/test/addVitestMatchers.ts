@@ -1,5 +1,6 @@
-import { expect } from 'vitest';
+import { beforeAll, expect } from 'vitest';
 import { isInaccessible, prettyDOM } from '@testing-library/dom';
+import * as jestDomMatchers from '@testing-library/jest-dom/matchers';
 
 declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Match Vitest's type parameters for declaration merging.
@@ -20,28 +21,33 @@ function isVisibilityVisible(element: Element) {
   return visibility !== 'hidden' && visibility !== 'collapse';
 }
 
+// Registered in `beforeAll` so that they replace the jest-dom matchers whatever the order in
+// which the setup modules are evaluated.
+beforeAll(() => {
+  expect.extend({
+    // In the React package `toBeVisible` is the `chai-dom` assertion that
+    // `@mui/internal-test-utils` installs, which only looks at the computed `visibility`. It takes
+    // precedence there over the stricter `@testing-library/jest-dom` matcher of the same name
+    // (which also check `display`, `opacity` and every ancestor). The ported tests rely on the
+    // lenient one, for example for a popup that has no anchor and so keeps `opacity: 0`.
+    //
+    // A negated assertion (`not.toBeVisible()`) keeps the strict jest-dom check: an element only
+    // counts as not visible when it, or an ancestor, is really hidden.
+    toBeVisible(received: Element) {
+      if (this.isNot) {
+        return jestDomMatchers.toBeVisible.call(this as never, received as HTMLElement);
+      }
+      const pass = isVisibilityVisible(received);
+      return {
+        pass,
+        message: () =>
+          `expected \n${prettyDOM(received, undefined, { maxDepth: 1 })} ${pass ? 'not ' : ''}to be visible`,
+      };
+    },
+  });
+});
+
 expect.extend({
-  // In the React package `toBeVisible` and `toBeHidden` are the `chai-dom` assertions that
-  // `@mui/internal-test-utils` installs, which only look at the computed `visibility`. They take
-  // precedence there over the stricter `@testing-library/jest-dom` matchers of the same name
-  // (which also check `display`, `opacity` and every ancestor). The ported tests rely on the
-  // lenient ones, for example for a popup that has no anchor and so keeps `opacity: 0`.
-  toBeVisible(received: Element) {
-    const pass = isVisibilityVisible(received);
-    return {
-      pass,
-      message: () =>
-        `expected \n${prettyDOM(received, undefined, { maxDepth: 1 })} ${pass ? 'not ' : ''}to be visible`,
-    };
-  },
-  toBeHidden(received: Element) {
-    const pass = !isVisibilityVisible(received);
-    return {
-      pass,
-      message: () =>
-        `expected \n${prettyDOM(received, undefined, { maxDepth: 1 })} ${pass ? 'not ' : ''}to be hidden`,
-    };
-  },
   toBeInaccessible(received: Element) {
     const pass = isInaccessible(received);
     const element = prettyDOM(received, undefined, { maxDepth: 1 });
