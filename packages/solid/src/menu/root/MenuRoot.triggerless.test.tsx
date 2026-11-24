@@ -248,20 +248,6 @@ describe('<Menu.Root /> without a trigger', () => {
       }
       function Demo() {
         const [hasTrigger, setHasTrigger] = createSignal(initialTrigger);
-        useIsoLayoutEffect(
-          () => [hasTrigger()],
-          ([currentHasTrigger]) => {
-            if (currentHasTrigger) {
-              const [store, nodeId, parentNodeId] = registered.mock.lastCall!;
-              rootIds(
-                store.select('floatingNodeId'),
-                nodeId,
-                store.select('floatingParentNodeId'),
-                parentNodeId,
-              );
-            }
-          },
-        );
         return (
           <Menu.Root defaultOpen modal={false} onOpenChange={changed}>
             <Show when={hasTrigger()}>
@@ -295,6 +281,15 @@ describe('<Menu.Root /> without a trigger', () => {
       const { user } = await render(() => <Demo />);
       await focusItem('More');
       await user.keyboard('{F2}');
+      // Solid port: read the ids registered by the child's effect here rather than from Demo's
+      // effect, which runs before its descendants' effects in Solid.
+      const [store, nodeId, parentNodeId] = registered.mock.lastCall!;
+      rootIds(
+        store.select('floatingNodeId'),
+        nodeId,
+        store.select('floatingParentNodeId'),
+        parentNodeId,
+      );
       const trigger = screen.getByRole('button', { name: 'Options' });
       expect(rootIds).toHaveBeenCalled();
       for (const [nodeId, triggerNodeId, parentNodeId, triggerParentNodeId] of rootIds.mock.calls) {

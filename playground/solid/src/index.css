@@ -1,0 +1,95 @@
+/* Minimal stand-ins for what the docs site provides around the demos. */
+:root {
+  color-scheme: light dark;
+  --page-bg: white;
+  --page-fg: oklch(14.5% 0 0deg);
+  --nav-bg: oklch(98.5% 0 0deg);
+  --border: oklch(92.2% 0 0deg);
+  --muted: oklch(55.6% 0 0deg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page-bg: oklch(14.5% 0 0deg);
+    --page-fg: white;
+    --nav-bg: oklch(20.5% 0 0deg);
+    --border: oklch(26.9% 0 0deg);
+    --muted: oklch(70.8% 0 0deg);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--page-bg);
+  color: var(--page-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.Layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.Nav {
+  flex: 0 0 15rem;
+  padding: 1rem;
+  border-right: 1px solid var(--border);
+  background: var(--nav-bg);
+}
+
+.NavTitle {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.Nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.Nav a {
+  display: block;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.Nav a:hover,
+.Nav a[aria-current='page'] {
+  color: var(--page-fg);
+}
+
+.Nav a[aria-current='page'] {
+  font-weight: 600;
+}
+
+.Main {
+  flex: 1;
+  min-width: 0;
+  padding: 1.5rem;
+}
+
+.DemoTitle {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.Stage {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 24rem;
+  padding: 3rem 1rem;
+  border: 1px solid var(--border);
+}

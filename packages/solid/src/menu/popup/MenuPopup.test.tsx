@@ -271,7 +271,7 @@ describe('<Menu.Popup />', () => {
             </Menu.Portal>
           </Menu.Root>
           <Show when={renaming()}>
-            <input aria-label="Name" autofocus />
+            <input aria-label="Name" ref={(el) => queueMicrotask(() => el.focus())} />
           </Show>
           <Menu.Root
             onOpenChangeComplete={(open) => {

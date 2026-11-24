@@ -137,7 +137,7 @@ describe('<Menu.Trigger />', () => {
       await screen.findByRole('menu', { hidden: false });
 
       const mouseUpListener = addEventListenerSpy.mock.calls.find(
-        (call) => call[0] === 'mouseup',
+        (call) => call[0] === 'mouseup' && typeof call[2] === 'object' && call[2].once,
       )?.[1];
       expect(mouseUpListener).toBeTypeOf('function');
 

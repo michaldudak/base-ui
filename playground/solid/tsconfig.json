@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "es2022",
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": [
+      "es2022",
+      "dom",
+      "dom.iterable"
+    ],
     "module": "esnext",
     "moduleResolution": "bundler",
     "jsx": "preserve",
@@ -9,10 +13,17 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["vite/client"],
+    "types": [
+      "vite/client"
+    ],
     "paths": {
-      "@base-ui/solid/*": ["../../packages/solid/src/*"]
+      "@base-ui/solid/*": [
+        "../../packages/solid/src/*"
+      ]
     }
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "../../packages/solid/src/env.d.ts"
+  ]
 }

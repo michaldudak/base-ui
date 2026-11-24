@@ -160,7 +160,12 @@ export function useFloatingPortalNode(
         }
       }
 
-      if (container && !isNode(container) && !container.current) {
+      // Solid port: React reads a ref object's `current` here when it is already set, since only
+      // ancestor and later sibling refs attach after this effect. Solid attaches every ref while
+      // creating the elements, before any effect runs, so a set `current` doesn't mean the effects
+      // that may still replace the element (as React's cascading layout updates do) have settled.
+      // A ref object is therefore always resolved through the retry, after they have.
+      if (container && !isNode(container)) {
         // Ancestor and later sibling refs attach after this effect. Wait for the retry to commit.
         pendingResolveRef.current = resolveContainer;
         setContainerCheck((value) => value + 1);

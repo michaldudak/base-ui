@@ -202,7 +202,8 @@ export function MenuPopupPlain(componentProps: MenuPopupPlainProps): JSX.Element
         // A rendered `Menu.List` carries the `menu` semantics instead.
         ...(listElement() ? { role: 'presentation' } : menuSemanticsProps()),
         onKeyDown: handleKeyDown,
-        onFocus: handleFocus,
+        // Solid port: React's `onFocus` bubbles like `focusin`, and focus lands on an item inside.
+        onFocusIn: handleFocus,
       },
       getDisabledMountTransitionStyles(transitionStatus()),
       elementProps,

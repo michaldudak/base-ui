@@ -7,41 +7,6 @@ import type { FilterDropdownItemContext } from '../root/FilterDropdownRootContex
 import { useFilterDropdownGroupContext } from '../group/FilterDropdownGroupContext';
 import { DETACHED_OWNER } from '../store';
 
-/**
- * Text of the rendered children, for when the element is filtered out and has no DOM node.
- *
- * Solid port: Solid children are already rendered values (strings, numbers, DOM nodes, arrays
- * and accessors), so the text is read from them rather than from element descriptions.
- */
-function childrenText(children: unknown): string {
-  if (typeof children === 'string' || typeof children === 'number') {
-    return String(children);
-  }
-  if (Array.isArray(children)) {
-    return children.map(childrenText).join('');
-  }
-  if (typeof children === 'function') {
-    return childrenText(children());
-  }
-  if (children != null && typeof children === 'object' && 'nodeType' in children) {
-    return (children as Node).textContent ?? '';
-  }
-  return '';
-}
-
-/**
- * Solid port: reading Solid children creates them. A child that needs a context provided inside
- * the item (an indicator, for example) throws when created outside it, so a failed read reports
- * no text (`undefined`) and the cached text is kept.
- */
-function readChildrenText(read: () => unknown): string | undefined {
-  try {
-    return childrenText(read());
-  } catch {
-    return undefined;
-  }
-}
-
 export interface UseFilterDropdownItemParameters {
   /**
    * A text representation of the item used for filtering. Falls back to the rendered text.
@@ -124,39 +89,19 @@ export function useFilterDropdownItem(
 
   const visible = () => !registered() || matched();
 
-  // What the children last read as, to tell whether they changed while the item rendered no text.
-  const childrenTextRef = { current: undefined as string | undefined };
-
-  // Solid port: takes the label and the children's text (read by the caller in a tracking scope,
-  // `undefined` when unknown) instead of reading them through refs.
-  const resolveText = (label: string | undefined, fromChildren: string | undefined) => {
+  // Solid port: React resolves a filtered-out item's text from its children (element
+  // descriptions). Reading Solid children (or calling a `render` function) creates them, which
+  // would mount a hidden item's content again, so a filtered-out item keeps the text it last
+  // rendered. A mounted item's text is read from its element whenever the query runs.
+  const resolveText = (label: string | undefined) => {
     if (label != null) {
       return label;
-    }
-    // An item without children can carry its text in its `render` element instead.
-    // Solid port: the `render` prop has no element form, so only the children are read.
-    const previousChildrenText = childrenTextRef.current;
-    if (fromChildren !== undefined) {
-      childrenTextRef.current = fromChildren;
     }
     const element = getElement();
     if (element !== null) {
       return element.textContent ?? '';
     }
-    // A filtered-out item has no DOM node left. Its children are only a stand-in for the text it
-    // renders, which can differ (a translation component, for example), so the cached text wins
-    // unless the children changed.
-    // Solid port: the children are only read while the item has no element, so the first read
-    // after it was filtered out has nothing to compare with and keeps the cached text too.
-    if (
-      registeredTextRef.current !== undefined &&
-      (fromChildren === undefined ||
-        previousChildrenText === undefined ||
-        fromChildren === previousChildrenText)
-    ) {
-      return registeredTextRef.current;
-    }
-    return fromChildren ?? '';
+    return registeredTextRef.current ?? '';
   };
 
   const register = (label: string | undefined, resolvedText: string) => {
@@ -182,7 +127,7 @@ export function useFilterDropdownItem(
   useIsoLayoutEffect(
     () => [params.label] as const,
     ([label]) => {
-      const unregister = register(label, resolveText(label, undefined));
+      const unregister = register(label, resolveText(label));
       setRegistered(true);
       return unregister;
     },
@@ -191,33 +136,6 @@ export function useFilterDropdownItem(
   useIsoLayoutEffect(
     () => [params.retainGroup ?? false] as const,
     ([retainGroup]) => registerGroupItem?.(itemId, retainGroup),
-  );
-
-  // Re-register when the item's text changes, so the active query runs again.
-  // Solid port: the children are read (which tracks them) only while the item is hidden, since
-  // reading Solid children creates them; a rendered item's text is read from its element whenever
-  // the query runs.
-  let firstTextRun = true;
-  useIsoLayoutEffect(
-    () =>
-      [params.label, visible() ? undefined : readChildrenText(() => params.children)] as const,
-    ([label, fromChildren]) => {
-      if (firstTextRun) {
-        // Solid port: the registration effect above already resolved the text on mount.
-        firstTextRun = false;
-        if (fromChildren !== undefined) {
-          childrenTextRef.current = fromChildren;
-        }
-        return;
-      }
-      const text = resolveText(label, fromChildren);
-      if (text !== registeredTextRef.current) {
-        registeredTextRef.current = text;
-        // Solid port: re-registers alongside the registration effect's entry, which the effect's
-        // cleanup removes, like React's `void register(text)`.
-        void register(label, text);
-      }
-    },
   );
 
   return { visible, ref: setElement };

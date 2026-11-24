@@ -150,7 +150,7 @@ export function MenuRootInternal<Payload>(props: MenuRootInternalProps<Payload>)
       return menuStore;
     },
     defaultPopupId,
-    { animateInitialOpen },
+    { animateInitialOpen, handle: () => props.handle },
   );
 
   const floatingTreeRoot = store.useState('floatingTreeRoot');
@@ -648,7 +648,6 @@ export function MenuRootInternal<Payload>(props: MenuRootInternalProps<Payload>)
     <MenuRootContext value={context as MenuRootContext}>
       {renderPopupRootChildren({
         store,
-        handle: () => props.handle,
         get children() {
           return props.children;
         },

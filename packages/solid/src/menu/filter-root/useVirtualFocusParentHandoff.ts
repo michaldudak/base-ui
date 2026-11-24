@@ -48,6 +48,20 @@ export function useVirtualFocusParentHandoff(
     }
   };
 
+  // Solid port: the root's unmount, a passive effect in React that runs after this layout effect,
+  // runs before it here (parents' effects run first) and clears `activeTriggerElement` in the same
+  // flush. Keep the trigger the open popup was anchored to so the close below still sees it.
+  const activeTriggerElement = store.useState('activeTriggerElement');
+  let openTriggerElement: Element | null = null;
+  useIsoLayoutEffect(
+    () => [access(open), activeTriggerElement()] as const,
+    ([isOpen, element]) => {
+      if (isOpen) {
+        openTriggerElement = element;
+      }
+    },
+  );
+
   useIsoLayoutEffect(
     // Solid port: `virtualFocus` is read through the stable callback in React, so it is passed
     // along without being a dependency.
@@ -57,7 +71,8 @@ export function useVirtualFocusParentHandoff(
         // A parent closing in the same commit, such as on an item press, syncs its controlled `open`
         // in its own layout effect, which runs after this one. An unmount can clear the trigger by
         // then, so read it now.
-        const trigger = store.state.activeTriggerElement;
+        const trigger = store.state.activeTriggerElement ?? openTriggerElement;
+        openTriggerElement = null;
         const reason = store.select('lastOpenChangeReason');
         queueMicrotask(() => returnToParent(trigger, reason, isVirtualFocus));
       }

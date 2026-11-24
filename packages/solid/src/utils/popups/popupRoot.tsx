@@ -1,4 +1,4 @@
-import { createMemo, onCleanup, Show, untrack } from 'solid-js';
+import { createMemo, onCleanup, untrack } from 'solid-js';
 import type { Accessor } from 'solid-js';
 import type { JSX } from '@solidjs/web';
 import type { SolidStore } from '#utils/store';
@@ -66,6 +66,16 @@ export interface UsePopupRootOptions {
 }
 
 /**
+ * `UsePopupRootOptions` plus the handle the Root's store attaches to.
+ */
+export interface UsePopupRootWithHandleOptions<Store> extends UsePopupRootOptions {
+  /**
+   * The handle to attach the Root's store to while the Root is mounted.
+   */
+  handle?: MaybeAccessor<PopupRootStoreHandle<Store> | undefined>;
+}
+
+/**
  * The popup store members a popup Root relies on.
  */
 type PopupRootStore = SolidStore<
@@ -97,7 +107,7 @@ type PopupRootStore = SolidStore<
 export function usePopupRoot<Store extends PopupRootStore>(
   props: PopupRootProps<Store>,
   createStore: (initialState: PopupRootInitialState, defaultPopupId: string | undefined) => Store,
-  options: UsePopupRootOptions = {},
+  options: UsePopupRootWithHandleOptions<Store> = {},
 ) {
   const defaultPopupId = useId();
   return usePopupRootWithPopupId(props, createStore, defaultPopupId, options);
@@ -112,7 +122,7 @@ export function usePopupRootWithPopupId<Store extends PopupRootStore>(
   props: PopupRootProps<Store>,
   createStore: (initialState: PopupRootInitialState, defaultPopupId: string | undefined) => Store,
   defaultPopupId: MaybeAccessor<string | undefined>,
-  options: UsePopupRootOptions = {},
+  options: UsePopupRootWithHandleOptions<Store> = {},
 ) {
   const disabled = () => access(options.disabled) ?? false;
 
@@ -128,6 +138,7 @@ export function usePopupRootWithPopupId<Store extends PopupRootStore>(
         initialPopupId,
       ),
     defaultPopupId,
+    () => access(options.handle),
   );
 
   const transitionOpen = usePopupRootOpenState(store, props, disabled);
@@ -176,6 +187,7 @@ export function useSingleAnchorPopupRoot<Store extends PopupRootStore>(
         initialPopupId,
       ),
     useId(),
+    undefined,
   );
 
   const open = usePopupRootOpenState(store, props, () => false);
@@ -245,23 +257,23 @@ function usePopupRootTransitions<Store extends PopupRootStore>(
 /**
  * Renders what a popup Root renders inside its context provider, in the order it needs:
  *
- * 1. The handle attachment, so its layout effect runs before its descendants' and they can call the
- *    handle during the Root's initial commit.
- * 2. The interactions.
- * 3. `children`, called with the payload when it's a function.
+ * 1. The interactions.
+ * 2. `children`, called with the payload when it's a function.
+ *
+ * Solid port: the handle attachment is not rendered here. Children are rendered lazily, after the
+ * effects of later siblings were created, so an attachment rendered as a child would attach after
+ * them; React's attachment runs its layout effect before those. `usePopupRoot` attaches the handle
+ * from an effect created in the Root's body instead (see `usePopupRootStore`).
  *
  * It's a plain function rather than a component. Call it inside the Root's context provider.
  * `parameters` is read lazily: pass getters (or accessors) for values that change.
  */
 export function renderPopupRootChildren<Store, Payload>(parameters: {
   store: Store;
-  handle: MaybeAccessor<PopupRootStoreHandle<Store> | undefined>;
   interactions?: JSX.Element;
   children: JSX.Element | PayloadChildRenderFunction<Payload>;
   payload: Accessor<Payload | undefined>;
 }): JSX.Element {
-  const { store } = parameters;
-
   // The argument of a payload render function, whose `payload` follows the store.
   const renderArg = {
     get payload() {
@@ -271,9 +283,6 @@ export function renderPopupRootChildren<Store, Payload>(parameters: {
 
   return (
     <>
-      <Show when={access(parameters.handle)} keyed>
-        {(handle) => <PopupHandleAttachment handle={handle} store={store} />}
-      </Show>
       {parameters.interactions}
       {(() => {
         const children = parameters.children;
@@ -309,16 +318,20 @@ interface PopupRootStoreHandle<Store> {
  * @param createStore Factory that builds the store. Called exactly once, receiving the default
  * popup id resolved on the first render.
  * @param defaultPopupId The default popup id, or `undefined` to leave the popup without one.
+ * @param handle The handle to attach the store to while the Root is mounted, if any.
  */
 function usePopupRootStore<Store extends PopupRootStore>(
   createStore: (defaultPopupId: string | undefined) => Store,
   defaultPopupId: MaybeAccessor<string | undefined>,
+  handle: MaybeAccessor<PopupRootStoreHandle<Store> | undefined>,
 ): Store {
   const parentNodeId = useFloatingParentNodeId();
 
   // Created once: the props and the default popup id only seed it, so they are read once on
   // purpose.
   const store = untrack(() => createStore(access(defaultPopupId)));
+
+  usePopupHandleAttachment(handle, store);
 
   store.useSyncedValue('defaultPopupId', () => access(defaultPopupId));
   // Kept current from an effect. A parent's effects run before its children's, so the popup's
@@ -334,27 +347,31 @@ function usePopupRootStore<Store extends PopupRootStore>(
 }
 
 /**
- * Attaches a Root's store to a handle for this component's committed lifetime. Rendered before the
- * Root's interactions and user children so its layout effect runs before descendant layout
- * effects. This lets descendants call the handle during the Root's initial commit without attaching
- * during render, which would leak suspended or abandoned stores. Store subscribers are notified by
- * `attachStore` in this ordinary layout phase, where React permits synchronous updates.
+ * Attaches a Root's store to a handle for the Root's committed lifetime. This lets descendants call
+ * the handle during the Root's initial commit without attaching during render, which would leak
+ * suspended or abandoned stores. Store subscribers are notified by `attachStore` from an effect.
  *
- * Rendered only when a handle is present so handle-less Roots avoid mounting an extra fiber and
- * layout effect.
+ * Solid port: React renders this as a `PopupHandleAttachment` child placed before the Root's
+ * interactions and user children, so its layout effect runs before the layout effects of the
+ * Root's descendants, of the Root itself, and of later siblings. Solid runs a parent's effects
+ * before its children's and creates the Root's children lazily, so the attachment is an effect
+ * created first thing in the Root's body instead: it runs before the Root's other effects, its
+ * descendants' and its later siblings'. It re-attaches when the handle changes and detaches on
+ * cleanup, and does nothing for a handle-less Root.
  */
-function PopupHandleAttachment<Store>(props: {
-  handle: PopupRootStoreHandle<Store>;
-  store: Store;
-}): JSX.Element {
+function usePopupHandleAttachment<Store>(
+  handle: MaybeAccessor<PopupRootStoreHandle<Store> | undefined>,
+  store: Store,
+) {
   useIsoLayoutEffect(
-    () => [props.handle, props.store] as const,
-    ([handle, store]) => {
-      return handle.attachStore(store);
+    () => [access(handle)] as const,
+    ([currentHandle]) => {
+      if (!currentHandle) {
+        return undefined;
+      }
+      return currentHandle.attachStore(store);
     },
   );
-
-  return null;
 }
 
 /**

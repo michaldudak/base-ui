@@ -3943,7 +3943,7 @@ describe('<Menu.Root />', () => {
       expect(details.event).toBe(hoverEvent);
       expect(details.event).not.toBeInstanceOf(PointerEvent);
 
-      const leaveEvent = new PointerEvent('pointerout', {
+      const leaveEvent = new PointerEvent('pointerleave', {
         bubbles: true,
         pointerType: 'mouse',
       });
@@ -4386,7 +4386,8 @@ describe('<Menu.Root />', () => {
       );
     });
 
-    it('ignores a request made before the root has mounted', async () => {
+    // Solid port: effects run parent-first, so a child cannot request a change before its root has mounted
+    it.skip('ignores a request made before the root has mounted', async () => {
       const handle = Menu.createHandle();
       const onOpenChange = vi.fn();
 
