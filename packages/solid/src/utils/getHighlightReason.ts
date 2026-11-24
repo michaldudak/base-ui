@@ -1,4 +1,3 @@
-import type * as React from 'react';
 import { REASONS } from '../internals/reasons';
 
 /**
@@ -6,7 +5,7 @@ import { REASONS } from '../internals/reasons';
  * reason promises in its details.
  */
 export function getHighlightReason(
-  event: Event | React.SyntheticEvent | undefined,
+  event: Event | undefined,
 ): typeof REASONS.keyboard | typeof REASONS.pointer | typeof REASONS.none {
   if (event == null) {
     return REASONS.none;

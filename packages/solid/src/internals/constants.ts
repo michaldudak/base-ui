@@ -1,4 +1,4 @@
-import type * as React from 'react';
+import type { JSX } from '@solidjs/web';
 
 export const TYPEAHEAD_RESET_MS = 500;
 export const PATIENT_CLICK_THRESHOLD = 500;
@@ -33,9 +33,9 @@ export const POPUP_COLLISION_AVOIDANCE = {
  * The owner element is an empty span, so most of the common visually hidden styles are not needed.
  * @see https://github.com/floating-ui/floating-ui/issues/3403
  */
-export const ownerVisuallyHidden: React.CSSProperties = {
-  clipPath: 'inset(50%)',
+export const ownerVisuallyHidden: JSX.CSSProperties = {
+  'clip-path': 'inset(50%)',
   position: 'fixed',
-  top: 0,
-  left: 0,
+  top: '0',
+  left: '0',
 };

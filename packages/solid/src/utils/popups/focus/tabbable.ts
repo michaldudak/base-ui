@@ -255,7 +255,7 @@ export function getTabbableNearElement(
   return list[index];
 }
 
-export function isOutsideEvent(event: FocusEvent | React.FocusEvent, container?: Element) {
+export function isOutsideEvent(event: FocusEvent, container?: Element) {
   const containerElement = container || (event.currentTarget as Element);
   const relatedTarget = event.relatedTarget as HTMLElement | null;
   return !relatedTarget || !contains(containerElement, relatedTarget);

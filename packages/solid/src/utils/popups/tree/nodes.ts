@@ -10,7 +10,7 @@ export function getNodeChildren(
   const directChildren = nodes.filter((node) => node.parentId === id);
 
   return directChildren.flatMap((child) => [
-    ...(!onlyOpenChildren || child.context?.open ? [child] : []),
+    ...(!onlyOpenChildren || child.context?.open() ? [child] : []),
     ...getNodeChildren(nodes, child.id, onlyOpenChildren),
   ]);
 }

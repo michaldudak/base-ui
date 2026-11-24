@@ -1,0 +1,28 @@
+import { CommonPopupDataAttributes } from '../../utils/popups/popupStateMapping';
+
+/**
+ * Present when the menu popup is open.
+ */
+export const open = CommonPopupDataAttributes.open;
+/**
+ * Present when the menu popup is closed.
+ */
+export const closed = CommonPopupDataAttributes.closed;
+/**
+ * Present when the menu is a submenu.
+ */
+export const nested = 'data-nested';
+/**
+ * Present when the anchor is hidden.
+ */
+export const anchorHidden = CommonPopupDataAttributes.anchorHidden;
+/**
+ * Indicates which side the popup is positioned relative to the anchor.
+ * @type {'top' | 'bottom' | 'left' | 'right' | 'inline-end' | 'inline-start'}
+ */
+export const side = CommonPopupDataAttributes.side;
+/**
+ * Indicates how the popup is aligned relative to the specified side.
+ * @type {'start' | 'center' | 'end'}
+ */
+export const align = CommonPopupDataAttributes.align;

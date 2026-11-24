@@ -1,7 +1,7 @@
 import { isElement } from '@floating-ui/utils/dom';
 import { Timeout } from '#utils/useTimeout';
 import { contains, getTarget } from '#utils/shadowDom';
-import type { Rect, Side } from '@floating-ui/react-dom';
+import type { Rect, Side } from '@floating-ui/dom';
 import type { HandleClose, HandleCloseOptions } from './useHoverShared';
 import { getNodeChildren } from '../tree/nodes';
 

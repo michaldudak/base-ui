@@ -6,7 +6,7 @@ import { createEventEmitter } from '../createEventEmitter';
  * This is a backing store for the `FloatingTree` component.
  */
 export class FloatingTreeStore {
-  public readonly nodesRef: React.RefObject<Array<FloatingNodeType>> = { current: [] };
+  public readonly nodesRef: { current: Array<FloatingNodeType> } = { current: [] };
 
   public readonly events: PopupEvents = createEventEmitter();
 

@@ -1,5 +1,4 @@
 /* eslint-disable no-bitwise */
-import type * as React from 'react';
 import { EMPTY_ARRAY } from '#utils/empty';
 import type { CompositeListContextValue, CompositeListRegistration } from './CompositeListContext';
 
@@ -19,15 +18,17 @@ export interface CompositeListModelParameters<Metadata> {
    * Explicit indexes can leave empty slots in the array.
    * `useListNavigation`'s `listRef` prop.
    */
-  elementsRef: React.RefObject<Array<HTMLElement | null>>;
+  elementsRef: { current: Array<HTMLElement | null> };
   /**
    * A ref to the list of element labels, ordered by their index.
    * `useTypeahead`'s `listRef` prop.
    */
-  labelsRef?: React.RefObject<Array<string | null>> | undefined;
+  labelsRef?: { current: Array<string | null> } | undefined;
   onMapChange?: ((newMap: Map<Element, CompositeMetadata<Metadata>>) => void) | undefined;
   /**
    * Schedules a commit of the list's owner, which then calls `flush` from a layout effect.
+   * (Solid: bumps a signal that the list's effect reads, so `flush` runs from that effect after
+   * the registered elements are inserted into the document.)
    * Called once per batch of registrations made while the list is clean.
    */
   requestFlush: () => void;
@@ -37,9 +38,9 @@ export interface CompositeListModelParameters<Metadata> {
 export class CompositeListModel<Metadata> {
   // Fields assigned in the constructor are declared rather than initialized, so they are not
   // defined twice: data grids construct one model per cell while rendering.
-  declare elementsRef: React.RefObject<Array<HTMLElement | null>>;
+  declare elementsRef: { current: Array<HTMLElement | null> };
 
-  declare labelsRef: React.RefObject<Array<string | null>> | undefined;
+  declare labelsRef: { current: Array<string | null> } | undefined;
 
   declare onMapChange: CompositeListModelParameters<Metadata>['onMapChange'];
 

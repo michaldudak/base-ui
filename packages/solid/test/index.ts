@@ -15,3 +15,8 @@ export { waitForPositioned } from './waitForPositioned';
 
 // Shared suites
 export { describeConformance } from './describeConformance';
+export { detachedTriggersConformanceTests } from './detachedTriggersConformanceTests';
+export { popupConformanceTests } from './popupConformanceTests';
+export { popupFocusPropsTests } from './popupFocusPropsTests';
+export { popupListConformanceTests } from './popupListConformanceTests';
+export { positionerConformanceTests } from './positionerConformanceTests';

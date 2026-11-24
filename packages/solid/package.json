@@ -6,6 +6,7 @@
   "license": "MIT",
   "type": "module",
   "exports": {
+    "./direction-provider": "./src/direction-provider/index.ts",
     "./menu": "./src/menu/index.ts",
     "./separator": "./src/separator/index.ts",
     "./merge-props": "./src/merge-props/index.ts"

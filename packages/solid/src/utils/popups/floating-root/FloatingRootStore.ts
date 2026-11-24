@@ -1,4 +1,4 @@
-import { ReactStore } from '#utils/store';
+import { SolidStore } from '#utils/store';
 import type { PopupInteractionContext, PositioningInteractionStore, ReferenceType } from '../types';
 import type { BaseUIChangeEventDetails } from '../../../internals/createBaseUIEventDetails';
 import { createEventEmitter } from '../createEventEmitter';
@@ -77,7 +77,7 @@ interface FloatingRootStoreOptions {
  * `onOpenChange`.
  */
 export class FloatingRootStore
-  extends ReactStore<Readonly<FloatingRootState>, FloatingRootStoreContext, typeof selectors>
+  extends SolidStore<Readonly<FloatingRootState>, FloatingRootStoreContext, typeof selectors>
   implements PositioningInteractionStore
 {
   constructor(options: FloatingRootStoreOptions) {

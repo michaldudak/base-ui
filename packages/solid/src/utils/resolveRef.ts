@@ -3,7 +3,7 @@
  * Otherwise, returns the argument itself.
  */
 export function resolveRef<T extends HTMLElement | null | undefined>(
-  maybeRef: T | React.RefObject<T>,
+  maybeRef: T | { current: T },
 ): T {
   if (maybeRef == null) {
     return maybeRef;

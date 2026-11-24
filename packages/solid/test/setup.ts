@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, vi } from 'vitest';
 import failOnConsole from 'vitest-fail-on-console';
 import '@testing-library/jest-dom/vitest';
+import './addVitestMatchers';
 import { flush } from 'solid-js';
 import { cleanup } from './internal-test-utils';
 import { reset as resetError } from '../src/base-utils/error';

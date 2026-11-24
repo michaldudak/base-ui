@@ -1,6 +1,6 @@
 import { ownerDocument, ownerWindow } from '#utils/owner';
 import { getSide } from '@floating-ui/utils';
-import type { Middleware } from '@floating-ui/react-dom';
+import type { Middleware } from '@floating-ui/dom';
 import { DEFAULT_SIDES } from './adaptiveOriginConstants';
 
 export const adaptiveOrigin: Middleware = {

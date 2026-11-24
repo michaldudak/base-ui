@@ -3,7 +3,7 @@ import { getComputedStyle } from '@floating-ui/utils/dom';
 
 import { closest } from '#utils/shadowDom';
 import { isElementDisabled } from '#utils/isElementDisabled';
-import type { Dimensions } from '@floating-ui/react-dom';
+import type { Dimensions } from '@floating-ui/dom';
 import { stopEvent } from '../../utils/popups/event';
 import { ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, ARROW_UP } from '../../utils/popups/constants';
 
@@ -18,14 +18,14 @@ export function isIndexOutOfListBounds(list: ReadonlyArray<HTMLElement | null>, 
 }
 
 export function getMinListIndex(
-  listRef: React.RefObject<ReadonlyArray<HTMLElement | null>>,
+  listRef: { current: ReadonlyArray<HTMLElement | null> },
   disabledIndices?: DisabledIndices | undefined,
 ) {
   return findNonDisabledListIndex(listRef.current, { disabledIndices });
 }
 
 export function getMaxListIndex(
-  listRef: React.RefObject<Array<HTMLElement | null>>,
+  listRef: { current: Array<HTMLElement | null> },
   disabledIndices?: DisabledIndices | undefined,
 ) {
   return findNonDisabledListIndex(listRef.current, {
@@ -124,11 +124,10 @@ export function getGridNavigatedIndex(
     prevIndex,
     stopEvent: stop = false,
   }: {
-    event: React.KeyboardEvent;
+    event: KeyboardEvent;
     orientation: 'horizontal' | 'vertical' | 'both';
     loopFocus: boolean;
-    onLoop?:
-      ((event: React.KeyboardEvent, prevIndex: number, nextIndex: number) => number) | undefined;
+    onLoop?: ((event: KeyboardEvent, prevIndex: number, nextIndex: number) => number) | undefined;
     rtl: boolean;
     cols: number;
     disabledIndices: DisabledIndices | undefined;

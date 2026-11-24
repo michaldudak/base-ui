@@ -16,10 +16,12 @@ export interface FloatingUIOpenChangeDetails {
 
 type WithPreventBaseUIHandler<Handler> =
   Handler extends JSX.EventHandlerUnion<infer Target, infer E, any>
-    ?
-        | ((event: BaseUIEvent<E> & { currentTarget: Target; target: Element }) => void)
-        | [(data: any, event: BaseUIEvent<E> & { currentTarget: Target; target: Element }) => void, any]
-        | undefined
+    ? | ((event: BaseUIEvent<E> & { currentTarget: Target; target: Element }) => void)
+      | [
+          (data: any, event: BaseUIEvent<E> & { currentTarget: Target; target: Element }) => void,
+          any,
+        ]
+      | undefined
     : Handler;
 
 /**
@@ -53,10 +55,7 @@ export type BaseUIComponentProps<
    * Accepts a tag name, a component, or a function that receives the props to spread
    * and the component's state and returns the element to render.
    */
-  render?:
-    | keyof JSX.IntrinsicElements
-    | ComponentRenderFn<RenderFunctionProps, State>
-    | undefined;
+  render?: keyof JSX.IntrinsicElements | ComponentRenderFn<RenderFunctionProps, State> | undefined;
   /**
    * Style applied to the element, or a function that
    * returns a style object based on the component's state.

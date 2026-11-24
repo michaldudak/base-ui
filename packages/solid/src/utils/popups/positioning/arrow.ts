@@ -1,4 +1,4 @@
-import type { Derivable, Middleware, Padding } from '@floating-ui/react-dom';
+import type { Derivable, Middleware, Padding } from '@floating-ui/dom';
 import {
   clamp,
   evaluate,
@@ -99,12 +99,12 @@ export const baseArrow = (options: ArrowOptions | Derivable<ArrowOptions>): Midd
 /**
  * Provides data to position an inner element of the floating element so that it
  * appears centered to the reference element.
- * This wraps the core `arrow` middleware to allow React refs as the element.
+ * This wraps the core `arrow` middleware to allow refs as the element.
  * @see https://floating-ui.com/docs/arrow
  */
 export const arrow = (
   options: ArrowOptions | Derivable<ArrowOptions>,
-  deps?: React.DependencyList,
+  deps?: readonly unknown[],
 ): Middleware => {
   const { name, fn } = baseArrow(options);
   return {

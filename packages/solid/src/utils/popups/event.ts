@@ -1,11 +1,11 @@
 import { platform } from '#utils/platform';
 
-export function stopEvent(event: Event | React.SyntheticEvent) {
+export function stopEvent(event: Event) {
   event.preventDefault();
   event.stopPropagation();
 }
 
-export function isReactEvent(event: any): event is React.SyntheticEvent {
+export function isReactEvent(event: any): event is Event & { nativeEvent: Event } {
   return 'nativeEvent' in event;
 }
 
@@ -57,7 +57,7 @@ export function isMouseLikePointerType(pointerType: string | undefined, strict?:
   return values.includes(pointerType);
 }
 
-export function isClickLikeEvent(event: Event | React.SyntheticEvent) {
+export function isClickLikeEvent(event: Event) {
   const type = event.type;
   return type === 'click' || type === 'mousedown' || type === 'keydown' || type === 'keyup';
 }

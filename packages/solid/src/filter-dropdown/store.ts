@@ -1,4 +1,4 @@
-import { ReactStore } from '#utils/store';
+import { SolidStore } from '#utils/store';
 import { EMPTY_OBJECT, NOOP } from '#utils/empty';
 
 export type State = {
@@ -16,7 +16,7 @@ export const selectors = {
     state.visibleItemIds === null || state.visibleItemIds.has(id),
 };
 
-export class FilterDropdownStore extends ReactStore<Readonly<State>, object, typeof selectors> {
+export class FilterDropdownStore extends SolidStore<Readonly<State>, object, typeof selectors> {
   constructor() {
     super({ visibleItemIds: null, registeredItemCount: 0 }, EMPTY_OBJECT, selectors);
   }

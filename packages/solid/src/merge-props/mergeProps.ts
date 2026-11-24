@@ -274,7 +274,8 @@ export function mergeRefs(...refs: RefValue[]): ((element: any) => void)[] {
     const ref = refs[i];
     if (Array.isArray(ref)) {
       result.push(...mergeRefs(...ref));
-    } else if (typeof ref === 'function') {
+    } else if (typeof ref === 'function' && !result.includes(ref)) {
+      // The same callback can arrive twice (as the component's `ref` and inside its props).
       result.push(ref);
     }
   }

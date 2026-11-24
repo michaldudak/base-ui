@@ -64,7 +64,7 @@ Consequences that drive every rule below:
 | `useId()` / `useBaseUiId(id)`                     | `useId()` from `#utils/useId` / `useBaseUiId(() => props.id)`, returns an accessor |
 | `useTimeout()` / `useAnimationFrame()`            | same names in `#utils/useTimeout`, `#utils/useAnimationFrame`         |
 | `ReactDOM.flushSync(fn)`                          | `fn(); flush();` (`flush` from `solid-js`)                            |
-| `React.createContext(undefined)` + `useContext`   | `createContext<T \| undefined>(undefined)` + `useContext` from `solid-js` |
+| `React.createContext(undefined)` + `useContext`   | `createContext<T \| null>(null)` + `useContext` from `solid-js` (see 3.5) |
 | `<Ctx.Provider value={v}>`                        | `<Ctx value={v}>`                                                     |
 | `ReactDOM.createPortal(children, node)`           | `<Portal mount={node}>{children}</Portal>` from `@solidjs/web`        |
 | `if (!mounted) return null`                       | `<Show when={mounted()}>...</Show>`, or `enabled` of `useRenderElement` |
@@ -201,8 +201,10 @@ onCleanup(() => setPopupElement(null));
 
 ### 3.5 Context
 
-- `export const XContext = createContext<XContext | undefined>(undefined);` and keep the
-  `useXContext(optional?)` helper with the same error message.
+- `export const XContext = createContext<XContext | null>(null);` and keep the
+  `useXContext(optional?)` helper with the same error message and the same return type
+  (`useContext(XContext) ?? undefined`). The default must be `null`, not `undefined`: in Solid 2
+  `useContext` **throws** when no provider is mounted and the default is `undefined`.
 - The context **value is a stable object created once**. Fields that change are `Accessor<T>`;
   stores, callbacks and refs are plain. Consumers call the accessors where they use them. Do not
   recreate the object in a memo.
@@ -325,6 +327,15 @@ in prop bags.
   with `{ ownedWrite: true }`. The store is safe to write anywhere.
 - An effect's second function must return `undefined` or a function. Use a block body.
 - `onClick={cond() ? a : b}` binds once. Decide inside one stable handler.
+- A JSX prop whose value is a call or other expression (`handle={Menu.createHandle()}`,
+  `items={[1, 2]}`) compiles to a **getter that is re-evaluated on every read**. Anything that
+  must keep its identity (handles, stores, arrays compared by reference) is created once in a
+  `const` and passed by name.
+- Inside an effect's cleanup, or anywhere else a "latest value" was read through a ref in React,
+  read props with `untrack(() => props.x)` at the point of use.
+- A callback read from a params object (`props.onNavigate`) is called as a plain property; a
+  parameter whose _value_ is a function and may change (`handleClose`, a predicate) is passed
+  through a getter on the params object, or wrapped as `() => fn`, never through `access()`.
 - `<Show>` and conditional rendering dispose the subtree like a React unmount: `onCleanup`
   callbacks and effect cleanups run, children first.
 - `<Portal mount={node}>` adds **no wrapper element**. Where React's code creates its own portal
@@ -337,7 +348,7 @@ in prop bags.
 
 The requirement: **keep every test as it is**. Only React-specific syntax changes. Test files keep
 their names, `describe`/`it` titles, order, and assertions. Record every test whose _body logic_
-(not just syntax) had to change, or that had to be skipped, in `packages/solid/TEST_CHANGES.md`
+(not just syntax) had to change, or that had to be skipped, in `packages/solid/test-changes/<group>.md`
 with the reason (one line per test: file, title, what changed, why).
 
 Imports stay the same except the package name: `@mui/internal-test-utils` (aliased to a Solid

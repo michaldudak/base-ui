@@ -1,0 +1,16 @@
+# Test changes: menu-popup group
+
+Tests whose translation needed more than the mechanical table of PORTING_GUIDE section 8, or that are skipped.
+
+- `trigger/MenuTrigger.test.tsx`, "does not have role prop inside a Popover": skipped (`it.skip`), body kept as a block comment. Needs Popover, which is not ported.
+- `trigger/MenuTrigger.test.tsx`, "has a role prop inside a Popover when not a native button": skipped, body kept as a block comment. Needs Popover.
+- `popup/MenuPopup.test.tsx`, "stops toolbar navigation keys without blocking ordinary key events": skipped, body kept as a block comment. Needs Toolbar (`ToolbarRootContext`).
+- `popup/MenuPopup.test.tsx`, "does not move focus behind a modal dialog to $name when an item hides the menu trigger" (both rows): skipped (`it.skip.each`), body kept as a block comment, so the callback takes no parameter. Needs Dialog.
+- `portal/MenuPortal.test.tsx`, "mounts and focuses an initially open menu inside an ancestor ref (...)" and "keeps a closed menu inside an ancestor ref when opening": dropped the `{ strict: false }` render option. It only turned off React StrictMode, which has no Solid counterpart. The container ref is a `{ current }` object set from a `ref` callback, because `container` takes the ref object.
+- `backdrop/MenuBackdrop.test.tsx`, "does not start an entry phase when initially open (controlled=%s)": `RecordState` depended on the `state` object (`[state]`). It now depends on `props.state.transitionStatus`, because the Solid state object is stable and has getters, so a change is seen only through the field.
+- `popup/MenuPopupTransitionState.test.tsx`, "starts each opening once (...)": `TrackedPopup` is a plain component (`omit` for `state`/`onState`, `ref` reaches the div through the spread). Its layout effect depends on `state.open`, `state.transitionStatus` and `onState`, read through the props. Browser-only; it does not run under jsdom.
+- `positioner/MenuPositioner.test.tsx`, "uses the dropdown default for a context menu", "uses the layout viewport for a root context menu", "disables cross-axis shifting when side collision avoidance is flip", "preserves explicit context-menu placement and offsets", "uses the visual viewport for a context menu submenu": skipped, bodies kept as block comments. Need ContextMenu.
+- `positioner/MenuPositioner.test.tsx`, "uses the dropdown default for a menubar menu": skipped, body kept as a block comment. Needs Menubar.
+- `positioner/MenuPositioner.test.tsx`, describe "Menubar parent" (both tests): `describe.skipIf(isJSDOM)` became `describe.skip`, bodies kept as block comments. Needs Menubar.
+- `positioner/MenuPositioner.test.tsx`, "when keepMounted=true, should keep the content mounted when closed" and "when keepMounted=false, should unmount the content when closed": `vitest-browser-react`'s `render`/`cleanup` became the `render` from `createRenderer`, and the `afterEach(cleanup)` was removed (the Solid renderer cleans up itself). `vitest-browser-react` is React-only. Browser-only; they do not run under jsdom.
+- `submenu-trigger/MenuSubmenuTrigger.test.tsx`, "warns without an owner stack when React cannot provide one": skipped, body kept as a block comment. It mocks `SafeReact.captureOwnerStack` (React owner stacks), which has no Solid equivalent. In React it is already skipped when `captureOwnerStack` is missing.
