@@ -88,6 +88,16 @@ export function useRenderElement<State extends Record<string, any>, RenderedElem
       outProps.style = mergeStyles(outProps.style, style as any);
     }
 
+    // Solid renders `true` as an empty attribute. ARIA and `data-*` attributes are enumerated,
+    // not boolean, so they get the string React would render.
+    // eslint-disable-next-line guard-for-in
+    for (const key in outProps) {
+      const value = outProps[key];
+      if (typeof value === 'boolean' && (key.startsWith('aria-') || key.startsWith('data-'))) {
+        outProps[key] = String(value);
+      }
+    }
+
     return outProps;
   });
 

@@ -146,17 +146,38 @@ export const fireEvent = ((target: any, event: any) => dtlFireEvent(target, even
   (fireEvent as any)[eventType] = (...args: any[]) => (dtlFireEvent as any)[eventType](...args);
 });
 
-// React Testing Library also dispatches the bubbling variants, because React listens to those.
-// The Solid components listen to `focusin`/`focusout` for the same reason.
-fireEvent.focus = (node: any, init?: any) => {
-  const result = dtlFireEvent.focus(node, init);
-  dtlFireEvent.focusIn(node, init);
-  return result;
+// React Testing Library pairs these events, because React derives `onMouseEnter`, `onFocus` and
+// the like from the bubbling events. The same pairs (in the same order) are dispatched here, so a
+// ported test drives both the native listeners and the bubbling ones.
+const { mouseEnter, mouseLeave, pointerEnter, pointerLeave, select, blur, focus } = dtlFireEvent;
+fireEvent.mouseEnter = (node: any, init?: any) => {
+  mouseEnter(node, init);
+  return dtlFireEvent.mouseOver(node, init);
+};
+fireEvent.mouseLeave = (node: any, init?: any) => {
+  mouseLeave(node, init);
+  return dtlFireEvent.mouseOut(node, init);
+};
+fireEvent.pointerEnter = (node: any, init?: any) => {
+  pointerEnter(node, init);
+  return dtlFireEvent.pointerOver(node, init);
+};
+fireEvent.pointerLeave = (node: any, init?: any) => {
+  pointerLeave(node, init);
+  return dtlFireEvent.pointerOut(node, init);
+};
+fireEvent.select = (node: any, init?: any) => {
+  select(node, init);
+  node.focus();
+  return dtlFireEvent.keyUp(node, init);
 };
 fireEvent.blur = (node: any, init?: any) => {
-  const result = dtlFireEvent.blur(node, init);
   dtlFireEvent.focusOut(node, init);
-  return result;
+  return blur(node, init);
+};
+fireEvent.focus = (node: any, init?: any) => {
+  dtlFireEvent.focusIn(node, init);
+  return focus(node, init);
 };
 
 function assertTargetsActiveElement(element: any, eventName: string) {
