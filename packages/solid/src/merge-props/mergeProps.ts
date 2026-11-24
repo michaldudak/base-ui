@@ -80,7 +80,7 @@ function mutablyMergeInto(
     const propName = propNames[i];
 
     // `children` is never read here: reading it creates the child elements. The element renderer
-    // forwards it lazily instead.
+    // forwards it lazily instead (and so does the public `mergeProps` in `./index.ts`).
     if (propName === 'children') {
       continue;
     }
@@ -194,9 +194,9 @@ function wrapEventHandler(handler: AnyHandler) {
 }
 
 export function makeEventPreventable<T extends Event>(event: BaseUIEvent<T>) {
-  // The same native event object reaches every handler in the chain (and ancestors' handlers),
-  // so the flag is reset for each element's own chain.
-  (event as { baseUIHandlerPrevented?: boolean }).baseUIHandlerPrevented = false;
+  // The same native event object reaches every handler in the chain and ancestors' handlers, like
+  // React's bubbling synthetic event, so a prevention also skips the Base UI handlers of ancestors
+  // (for example, list navigation on a popup when an input inside opts out of a key).
   event.preventBaseUIHandler = () => {
     (event as { baseUIHandlerPrevented?: boolean }).baseUIHandlerPrevented = true;
   };

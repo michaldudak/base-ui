@@ -747,14 +747,16 @@ describe('<Menu.Positioner />', () => {
 
   positionerConformanceTests({
     render,
-    viewport: true,
+    // Solid port: `Menu.Viewport` is outside the scope of the proof of concept, so the two
+    // Viewport cases of the suite are not registered (React passes `viewport: true`).
+    viewport: false,
     createComponent: (props) => (
       <Menu.Root {...props.root}>
         <Trigger {...props.trigger}>Trigger</Trigger>
         <Menu.Portal>
           <Menu.Positioner {...props.positioner}>
             <Menu.Popup {...props.popup}>
-              {props.viewport ? <Menu.Viewport>Popup</Menu.Viewport> : 'Popup'}
+              Popup
             </Menu.Popup>
           </Menu.Positioner>
         </Menu.Portal>

@@ -36,8 +36,8 @@ import { useMenubarContext } from '../../menubar/MenubarContext';
 import type { MenuParent } from '../root/MenuRoot';
 import { PATIENT_CLICK_THRESHOLD } from '../../internals/constants';
 import { FocusGuard } from '../../utils/popups/focus/FocusGuard';
-import { mergeProps } from '../../merge-props';
-import type { InputProps } from '../../merge-props';
+import { mergeProps } from '../../merge-props/mergeProps';
+import type { InputProps } from '../../merge-props/mergeProps';
 
 /**
  * A button that opens the menu.
@@ -335,50 +335,54 @@ function MenuTriggerImpl<Payload>(
     props,
   });
 
-  // The element is created once, so it stays the same DOM node whether the focus guards are
-  // rendered or not.
-  return (
-    <>
-      <Show when={isOpenedByThisTrigger()}>
-        <TriggerFocusGuard
-          guardRef={store.context.beforeTriggerFocusGuardRef}
-          onFocus={handlePreFocusGuardFocus}
-        />
-      </Show>
-      {element}
-      <Show when={isOpenedByThisTrigger()}>
-        <TriggerFocusGuard
-          guardRef={store.context.triggerFocusTargetRef}
-          onFocus={handleFocusTargetFocus}
-        />
-      </Show>
-    </>
+  // Solid port: React renders the two focus guards as siblings of the trigger while the menu is
+  // open. Rendering them as conditional siblings here would make Solid reconcile the trigger's own
+  // position, and it moves the trigger with `insertBefore`, which blurs a focused element in
+  // browsers without `Element.moveBefore`. The guards are created once and placed around the
+  // trigger by hand, so the trigger itself is never moved.
+  const beforeGuard = resolveElement(<FocusGuard onFocus={handlePreFocusGuardFocus} />);
+  const afterGuard = resolveElement(<FocusGuard onFocus={handleFocusTargetFocus} />);
+  const { beforeTriggerFocusGuardRef, triggerFocusTargetRef } = store.context;
+
+  useIsoLayoutEffect(
+    () => [isOpenedByThisTrigger()],
+    ([isOpen]) => {
+      const trigger = triggerElementRef.current;
+      if (!isOpen || trigger?.parentNode == null) {
+        return undefined;
+      }
+
+      trigger.before(beforeGuard);
+      trigger.after(afterGuard);
+      beforeTriggerFocusGuardRef.current = beforeGuard;
+      triggerFocusTargetRef.current = afterGuard;
+
+      return () => {
+        beforeGuard.remove();
+        afterGuard.remove();
+        if (beforeTriggerFocusGuardRef.current === beforeGuard) {
+          beforeTriggerFocusGuardRef.current = null;
+        }
+        if (triggerFocusTargetRef.current === afterGuard) {
+          triggerFocusTargetRef.current = null;
+        }
+      };
+    },
   );
+
+  return element;
 }
 
 /**
- * A focus guard whose element is published to `guardRef` while it is mounted.
+ * Returns the DOM element behind a piece of JSX. A component's result can be wrapped in accessors
+ * (the development build does this for hot reloading).
  */
-function TriggerFocusGuard(props: {
-  guardRef: { current: HTMLElement | null };
-  onFocus: (event: FocusEvent & { currentTarget: HTMLSpanElement }) => void;
-}): JSX.Element {
-  const guardRef = untrack(() => props.guardRef);
-  let guardElement: HTMLSpanElement | null = null;
-  onCleanup(() => {
-    if (guardRef.current === guardElement) {
-      guardRef.current = null;
-    }
-  });
-  return (
-    <FocusGuard
-      ref={(element: HTMLSpanElement) => {
-        guardElement = element;
-        guardRef.current = element;
-      }}
-      onFocus={(event: FocusEvent & { currentTarget: HTMLSpanElement }) => props.onFocus(event)}
-    />
-  );
+function resolveElement(jsx: JSX.Element): HTMLElement {
+  let value: unknown = jsx;
+  while (typeof value === 'function') {
+    value = untrack(value as () => unknown);
+  }
+  return value as HTMLElement;
 }
 
 export interface MenuTriggerProps<Payload = unknown>

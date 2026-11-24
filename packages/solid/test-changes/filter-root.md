@@ -15,3 +15,8 @@ All entries are in `menu/filter-root/MenuFilterRoot.test.tsx`.
 - "server-side rendering > shows the empty state after hydration when no items are rendered": `it.skip`, needs `renderToString`/`hydrate` in the Solid test renderer. Body kept as a block comment.
 - "accessible names > points aria-controls at the id of a server-created render element": `it.skip` (was `it.skipIf(reactMajor < 19)`). React-only: it passes a `react.lazy` Server Component element to `render`, which has no element form in Solid. Body kept as a block comment.
 - "with a Viewport > keeps real focus on the input while the cursor moves through the list": unchanged, but `Menu.Viewport` is not exported by the Solid Menu yet, so it does not type-check or run until it is.
+
+## Later fixes
+
+- `MenuFilterRoot.test.tsx`, "does not repeat matching when navigating past hidden component labels": React passes the content as `{() => (<>...</>)}`. In the Solid port a payload render function must declare its parameter (the rule Solid's own `<Show>` uses), because a lone component child can itself arrive as a zero-argument accessor. The payload is unused, so the content is passed directly.
+- `MenuFilterRoot.webkit.test.tsx`, `Test` helper: the input also gets a `ref` that focuses it when `autoFocus` is set. React DOM focuses `autoFocus` elements on mount; Solid does not.

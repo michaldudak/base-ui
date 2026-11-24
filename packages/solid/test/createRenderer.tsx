@@ -136,9 +136,29 @@ export function createRenderer(globalOptions: CreateRendererOptions = {}) {
   async function render(ui: RenderUi, options: RenderOptions = {}) {
     const testProps = createTestProps();
 
-    const result = await act(async () =>
-      solidRender(() => ui(testProps.proxy), { ...options, queries: allQueries } as any),
-    );
+    // The testing library registers its container for cleanup only after a successful render, so
+    // a render that throws (the "throws when rendered outside ..." tests) would leave its DOM
+    // behind for the following tests. The container is created here and removed on failure.
+    const ownsContainer = options.container == null;
+    const container =
+      options.container ??
+      (options.baseElement ?? document.body).appendChild(document.createElement('div'));
+
+    let result;
+    try {
+      result = await act(async () =>
+        solidRender(() => ui(testProps.proxy), {
+          ...options,
+          container,
+          queries: allQueries,
+        } as any),
+      );
+    } catch (error) {
+      if (ownsContainer) {
+        container.remove();
+      }
+      throw error;
+    }
 
     const user: UserEvent = userEvent.setup({ document });
 

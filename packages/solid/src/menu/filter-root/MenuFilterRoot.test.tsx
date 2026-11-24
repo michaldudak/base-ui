@@ -6492,25 +6492,23 @@ describe('filterable menu navigation regressions', () => {
     const { user } = await render(() => (
       <Menu.FilterProvider filter={filter} autoHighlight="always" defaultValue="Match">
         <Menu.Root defaultOpen>
-          {() => (
-            <>
-              <Menu.Trigger>Actions</Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Positioner>
-                  <Menu.Popup>
-                    <Menu.Input aria-label="Filter actions" />
-                    <Menu.List>
-                      {Array.from({ length: 20 }, (_, index) => (
-                        <Menu.Item>
-                          <Label text={index < 2 ? `Match ${index}` : `Hidden ${index}`} />
-                        </Menu.Item>
-                      ))}
-                    </Menu.List>
-                  </Menu.Popup>
-                </Menu.Positioner>
-              </Menu.Portal>
-            </>
-          )}
+          {/* Solid port: React wraps these in a `() => ...` render function. In Solid a render
+              function must declare its parameter (like `<Show>`), and the payload is unused. */}
+          <Menu.Trigger>Actions</Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Positioner>
+              <Menu.Popup>
+                <Menu.Input aria-label="Filter actions" />
+                <Menu.List>
+                  {Array.from({ length: 20 }, (_, index) => (
+                    <Menu.Item>
+                      <Label text={index < 2 ? `Match ${index}` : `Hidden ${index}`} />
+                    </Menu.Item>
+                  ))}
+                </Menu.List>
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
         </Menu.Root>
       </Menu.FilterProvider>
     ));

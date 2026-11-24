@@ -8,8 +8,8 @@ import type { StateAttributesMapping } from './getStateAttributesProps';
 import { getStateAttributesProps } from './getStateAttributesProps';
 import { resolveClassName } from '../utils/resolveClassName';
 import { resolveStyle } from '../utils/resolveStyle';
-import { mergeClassNames, mergePropsN, mergeRefs, mergeStyles } from '../merge-props';
-import type { InputProps } from '../merge-props';
+import { mergeClassNames, mergePropsN, mergeRefs, mergeStyles } from '../merge-props/mergeProps';
+import type { InputProps } from '../merge-props/mergeProps';
 
 type IntrinsicTagName = keyof JSX.IntrinsicElements;
 
@@ -176,7 +176,9 @@ function createPropsProxy(
         if (!keys.includes('ref')) {
           keys.push('ref');
         }
-        keys.push('children');
+        if (!keys.includes('children')) {
+          keys.push('children');
+        }
         return keys;
       },
       getOwnPropertyDescriptor(_, key) {

@@ -5,7 +5,7 @@ import { error } from '#utils/error';
 import { access } from '#utils/access';
 import type { MaybeAccessor } from '#utils/access';
 import { useEffect, useIsoLayoutEffect } from '#utils/useEffect';
-import { callEventHandler, makeEventPreventable, mergeProps } from '../../merge-props';
+import { callEventHandler, makeEventPreventable, mergeProps } from '../../merge-props/mergeProps';
 import { useCompositeRootContext } from '../composite/root/CompositeRootContext';
 import type { BaseUIEvent, HTMLProps } from '../types';
 import { useFocusableWhenDisabled } from '../../utils/useFocusableWhenDisabled';

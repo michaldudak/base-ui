@@ -5,7 +5,7 @@ import { useRenderElement } from '../../useRenderElement';
 import { useCompositeItem } from './useCompositeItem';
 import type { BaseUIComponentProps } from '../../types';
 import type { StateAttributesMapping } from '../../getStateAttributesProps';
-import type { InputProps } from '../../../merge-props';
+import type { InputProps } from '../../../merge-props/mergeProps';
 
 export function CompositeItem<Metadata, State extends Record<string, any>>(
   componentProps: CompositeItem.Props<Metadata, State>,

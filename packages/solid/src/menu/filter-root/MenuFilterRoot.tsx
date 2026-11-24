@@ -5,6 +5,7 @@ import type { MenuRoot } from '../root/MenuRoot';
 import type { MenuFilterProviderOptions } from '../filter-provider/MenuFilterProviderOptions';
 import { MenuFilterDropdown } from './MenuFilterDropdown';
 import { useMenuFilterRoot } from './useMenuFilterRoot';
+import type { PayloadChildRenderFunction } from '../../utils/popups/popupRoot';
 
 /**
  * The filterable implementation of `Menu.Root`, rendered in its place when the root sits inside
@@ -22,12 +23,21 @@ export function MenuFilterRoot<Payload>(props: MenuFilterRootProps<Payload>): JS
           {(() => {
             const content = children();
             // Called like a component: reads made in its body don't re-run this expression.
-            return typeof content === 'function' ? untrack(() => content(payload)) : content;
+            // As in `renderPopupRootChildren`, only a function that declares a parameter is a
+            // payload render function; a lone component child can resolve to an accessor (a
+            // `<Show>` returns a memo), which is left for Solid to insert reactively.
+            return isPayloadRenderFunction(content) ? untrack(() => content(payload)) : content;
           })()}
         </MenuFilterDropdown>
       )}
     </MenuRootInternal>
   );
+}
+
+function isPayloadRenderFunction<Payload>(
+  content: MenuRoot.Props<Payload>['children'],
+): content is PayloadChildRenderFunction<Payload> {
+  return typeof content === 'function' && content.length > 0;
 }
 
 export type MenuFilterRootProps<Payload = unknown> = MenuRoot.Props<Payload> &

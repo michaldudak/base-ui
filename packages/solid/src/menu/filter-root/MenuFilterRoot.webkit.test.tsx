@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from 'solid-js';
+import { createSignal, For, Show, untrack } from 'solid-js';
 import type { ParentProps } from 'solid-js';
 import { useEffect } from '#utils/useEffect';
 import { act, screen, waitFor } from '@mui/internal-test-utils';
@@ -35,7 +35,19 @@ function Test(props: { autoFocus?: boolean; inputKey?: string; showInput?: boole
               <Show when={props.showInput !== false}>
                 {/* Solid port: `key` remounts the input in React; `<For>` over the key does the same. */}
                 <For each={[props.inputKey]}>
-                  {() => <Menu.Input aria-label="Filter actions" autofocus={props.autoFocus} />}
+                  {() => (
+                    <Menu.Input
+                      aria-label="Filter actions"
+                      autofocus={props.autoFocus}
+                      // Solid port: React DOM focuses an `autoFocus` element when it mounts. Solid
+                      // leaves `autofocus` to the browser, which honors it only on page load.
+                      ref={(element) => {
+                        if (untrack(() => props.autoFocus)) {
+                          queueMicrotask(() => element.focus());
+                        }
+                      }}
+                    />
+                  )}
                 </For>
               </Show>
               <Menu.List>

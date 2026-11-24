@@ -46,6 +46,19 @@ failOnConsole({
   },
 });
 
+// Solid also hands the error that halted the reactive system to `reportError`, which a browser
+// turns into an uncaught `error` event. The same rule applies: a test that mocks `console.error`
+// expects the throw (and asserts it through the rejected `render`), so it is not reported twice.
+if (typeof globalThis.reportError === 'function') {
+  const originalReportError = globalThis.reportError;
+  globalThis.reportError = (error: unknown) => {
+    if (vi.isMockFunction(console.error)) {
+      return;
+    }
+    originalReportError.call(globalThis, error);
+  };
+}
+
 afterEach(() => {
   vi.resetAllMocks();
   globalThis.BASE_UI_ANIMATIONS_DISABLED = true;

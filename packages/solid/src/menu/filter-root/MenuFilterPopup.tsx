@@ -5,7 +5,7 @@ import type { FloatingFocusManagerProps } from '../../utils/popups/focus/Floatin
 import { MenuPopupPlain } from '../popup/MenuPopup';
 import type { MenuPopupProps } from '../popup/MenuPopup';
 import { useMenuRootContext } from '../root/MenuRootContext';
-import { mergeProps } from '../../merge-props';
+import { mergeProps } from '../../merge-props/mergeProps';
 import { REASONS } from '../../internals/reasons';
 
 /**

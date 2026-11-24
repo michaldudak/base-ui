@@ -2,7 +2,7 @@ import { onCleanup } from 'solid-js';
 import { access } from '#utils/access';
 import type { MaybeAccessor } from '#utils/access';
 import { useButton } from '../../internals/use-button';
-import { mergeProps } from '../../merge-props';
+import { mergeProps } from '../../merge-props/mergeProps';
 import type { HTMLProps } from '../../internals/types';
 import type { MenuStore } from '../store/MenuStore';
 import { useMenuItemCommonProps } from './useMenuItemCommonProps';

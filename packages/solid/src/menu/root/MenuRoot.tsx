@@ -27,7 +27,7 @@ import { REASONS } from '../../internals/reasons';
 import { getHighlightReason } from '../../utils/getHighlightReason';
 import type { ContextMenuRootContext } from '../../context-menu/root/ContextMenuRootContext';
 import { useContextMenuRootContext } from '../../context-menu/root/ContextMenuRootContext';
-import { mergeProps } from '../../merge-props';
+import { mergeProps } from '../../merge-props/mergeProps';
 import { useAnimationsFinished } from '../../internals/useAnimationsFinished';
 import { MenuStore } from '../store/MenuStore';
 import type { MenuHandle } from '../store/MenuHandle';

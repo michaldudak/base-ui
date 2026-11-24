@@ -9,7 +9,7 @@ import { useCompositeListItem } from '../../internals/composite/list/useComposit
 import { useMenuItemCommonProps } from '../item/useMenuItemCommonProps';
 import { REGULAR_ITEM } from '../item/useMenuItem';
 import { useButton } from '../../internals/use-button';
-import { mergeProps } from '../../merge-props';
+import { mergeProps } from '../../merge-props/mergeProps';
 
 function MenuLinkItemPlain(componentProps: MenuLinkItem.Props): JSX.Element {
   const elementProps = omit(
