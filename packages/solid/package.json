@@ -1,0 +1,46 @@
+{
+  "name": "@base-ui/solid",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Proof of concept: Base UI components for SolidJS.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./menu": "./src/menu/index.ts",
+    "./separator": "./src/separator/index.ts",
+    "./merge-props": "./src/merge-props/index.ts"
+  },
+  "scripts": {
+    "test": "vitest",
+    "typescript": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
+    "@floating-ui/utils": "^0.2.12"
+  },
+  "devDependencies": {
+    "@solidjs/testing-library": "1.0.0-rc.2",
+    "@solidjs/vite-plugin": "3.0.1",
+    "@solidjs/web": "2.0.3",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/user-event": "14.6.12",
+    "jsdom": "27.4.0",
+    "solid-js": "2.0.3",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.0",
+    "vitest-fail-on-console": "0.10.1"
+  },
+  "peerDependencies": {
+    "@solidjs/web": "^2.0.0",
+    "solid-js": "^2.0.0"
+  },
+  "sideEffects": false,
+  "imports": {
+    "#utils/store": "./src/base-utils/store/index.ts",
+    "#utils/platform": "./src/base-utils/platform/index.ts",
+    "#utils/*": "./src/base-utils/*.ts",
+    "#test-utils": "./test/index.ts"
+  }
+}
