@@ -12,7 +12,15 @@ import { useButton } from '../../internals/use-button';
 import { mergeProps } from '../../merge-props';
 
 function MenuLinkItemPlain(componentProps: MenuLinkItem.Props): JSX.Element {
-  const elementProps = omit(componentProps, 'render', 'class', 'id', 'label', 'closeOnClick', 'style');
+  const elementProps = omit(
+    componentProps,
+    'render',
+    'class',
+    'id',
+    'label',
+    'closeOnClick',
+    'style',
+  );
 
   const { store } = useMenuRootContext();
 

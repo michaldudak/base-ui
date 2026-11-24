@@ -1,24 +1,14 @@
 import { createContext, untrack, useContext } from 'solid-js';
 import type { Accessor } from 'solid-js';
 import type { JSX } from '@solidjs/web';
+import type { MaybeAccessor } from '#utils/access';
 import { MenuRootContext } from '../root/MenuRootContext';
 import type { HTMLProps } from '../../internals/types';
-import type { MaybeAccessor } from '#utils/access';
-import type { MenuPopup } from '../popup/MenuPopup';
-import type { MenuGroup } from '../group/MenuGroup';
-import type { MenuRadioGroup } from '../radio-group/MenuRadioGroup';
+import type { MenuFilterPopup } from './MenuFilterPopup';
+import type { MenuFilterGroup, MenuFilterRadioGroup } from './MenuFilterGroup';
+import type { MenuFilterList } from './MenuFilterList';
 import type { MenuParent } from '../root/MenuRoot';
 import type { MenuStore } from '../store/MenuStore';
-
-// Solid port: the filtering parts (`MenuFilterPopup`, `MenuFilterGroup`, `MenuFilterRadioGroup`,
-// `MenuFilterList`) are not ported yet. They take the props of the plain part they replace, which
-// is what the plain parts hand them; `Menu.List` is not ported either, so its props are loosened.
-type MenuFilterPopupComponent = (props: MenuPopup.Props) => JSX.Element;
-type MenuFilterListComponent = (props: any) => JSX.Element;
-type MenuFilterGroupComponent = (props: MenuGroup.Props) => JSX.Element;
-type MenuFilterRadioGroupComponent = <Value = any>(
-  props: MenuRadioGroup.Props<Value>,
-) => JSX.Element;
 
 /**
  * Solid port: the fields are read lazily (the item parts pass an object with getters), so the
@@ -26,15 +16,15 @@ type MenuFilterRadioGroupComponent = <Value = any>(
  */
 export interface MenuFilterItemParams {
   label?: string | undefined;
-  children?: JSX.Element;
+  children?: JSX.Element | undefined;
   render?: unknown;
 }
 
-export interface MenuFilterItemResult {
+export interface MenuFilterItemResult<Element extends HTMLElement = HTMLElement> {
   /** Whether the item matches the query. A hidden item renders nothing. */
   visible: Accessor<boolean>;
   /** Registers the element with the filter. */
-  ref: ((element: HTMLElement) => void) | ((element: HTMLElement) => void)[] | null;
+  ref: ((element: Element) => void) | ((element: Element) => void)[] | null;
   /** Props the filter needs on the element, merged under the consumer's. */
   props?: Accessor<HTMLProps> | undefined;
 }
@@ -46,10 +36,10 @@ export interface MenuFilterItemResult {
  * injected hook, so a menu that never renders them doesn't bundle a second implementation.
  */
 export interface MenuFilterImpl {
-  Popup: MenuFilterPopupComponent;
-  List: MenuFilterListComponent;
-  Group: MenuFilterGroupComponent;
-  RadioGroup: MenuFilterRadioGroupComponent;
+  Popup: typeof MenuFilterPopup;
+  List: typeof MenuFilterList;
+  Group: typeof MenuFilterGroup;
+  RadioGroup: typeof MenuFilterRadioGroup;
   /** Registers an item with the filter and reports whether it matches the query. */
   useItem: (params: MenuFilterItemParams) => MenuFilterItemResult;
   /** Like `useItem` for a submenu trigger, which is an item of the parent list. */
@@ -128,11 +118,11 @@ function useUnfilteredItem(): MenuFilterItemResult {
  * `ref` prop (`() => props.ref`); the returned `ref` calls it and the filter's, and the part
  * renders its plain implementation with it in place of its `ref` prop.
  */
-export function useMenuFilterItem(
+export function useMenuFilterItem<Element extends HTMLElement = HTMLElement>(
   props: MenuFilterItemParams,
-  forwardedRef: Accessor<JSX.Ref<HTMLElement> | undefined>,
+  forwardedRef: Accessor<JSX.Ref<Element> | undefined>,
   scope: MenuFilterPartScope = 'root',
-): MenuFilterItemResult {
+): UseMenuFilterItemReturnValue<Element> {
   const impl = useMenuFilterImpl(scope);
 
   const useItem =
@@ -148,15 +138,21 @@ export function useMenuFilterItem(
       return props.render;
     },
   });
-  const ref = (element: HTMLElement) => {
-    callRef(untrack(forwardedRef), element);
-    callRef(item.ref, element);
+  const ref = (element: Element) => {
+    callRef<Element>(untrack(forwardedRef), element);
+    callRef<HTMLElement>(item.ref, element);
   };
 
   return { visible: item.visible, ref, props: item.props };
 }
 
-function callRef(ref: JSX.Ref<HTMLElement> | null, element: HTMLElement) {
+export interface UseMenuFilterItemReturnValue<
+  Element extends HTMLElement = HTMLElement,
+> extends MenuFilterItemResult<Element> {
+  ref: (element: Element) => void;
+}
+
+function callRef<Element extends HTMLElement>(ref: JSX.Ref<Element> | null, element: Element) {
   if (Array.isArray(ref)) {
     for (let i = 0; i < ref.length; i += 1) {
       callRef(ref[i], element);

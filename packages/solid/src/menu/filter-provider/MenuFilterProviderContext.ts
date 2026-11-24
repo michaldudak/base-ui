@@ -1,18 +1,15 @@
 import { createContext } from 'solid-js';
-import type { JSX } from '@solidjs/web';
-
-// Solid port: the filtering parts (`MenuFilterRoot`, `MenuFilterSubmenuRoot`,
-// `MenuFilterProviderOptions`) are not ported yet, so their types are loosened here.
-type MenuFilterRootComponent = (props: any) => JSX.Element;
-type MenuFilterProviderOptions = Record<string, unknown>;
+import type { MenuFilterRoot } from '../filter-root/MenuFilterRoot';
+import type { MenuFilterSubmenuRoot } from '../filter-submenu-root/MenuFilterSubmenuRoot';
+import type { MenuFilterProviderOptions } from './MenuFilterProviderOptions';
 
 /**
  * What `Menu.FilterProvider` hands to the root directly inside it: the filterable root
  * implementations (the provider is their only importer) and the filter props.
  */
 export interface MenuFilterProviderContext {
-  Root: MenuFilterRootComponent;
-  SubmenuRoot: MenuFilterRootComponent;
+  Root: typeof MenuFilterRoot;
+  SubmenuRoot: typeof MenuFilterSubmenuRoot;
   options: MenuFilterProviderOptions;
 }
 

@@ -286,8 +286,16 @@ export class HoverIntent {
     this.restTimeout.clear();
     this.restTimeoutPending = false;
 
-    const handleCloseContextBase =
-      this.store.context.positioning ?? options.getHandleCloseContext?.();
+    // The positioning context holds `placement` as an accessor; safePolygon takes its value, which
+    // React reads off the context when the pointer leaves.
+    const positioning = this.store.context.positioning;
+    const handleCloseContextBase: HandleCloseContextBase | null | undefined = positioning
+      ? {
+          placement: positioning.placement(),
+          elements: positioning.elements,
+          nodeId: positioning.nodeId,
+        }
+      : options.getHandleCloseContext?.();
 
     if (isInsideEnabledTrigger(event.relatedTarget, store.context.triggerElements)) {
       return;

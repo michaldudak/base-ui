@@ -1,4 +1,4 @@
-import { createMemo, createSignal, flush, merge, onCleanup } from 'solid-js';
+import { createMemo, createSignal, flush, merge, onCleanup, untrack } from 'solid-js';
 import type { Accessor } from 'solid-js';
 import type { JSX } from '@solidjs/web';
 import {
@@ -536,14 +536,30 @@ export function useBaseUIFloating(
     },
   };
 
+  // The context's elements are read on demand by other popups in the tree (React reads them off
+  // the context object), from handlers and effects where a tracked read would warn.
+  const contextElements = {
+    get reference() {
+      return untrack(() => elements.reference);
+    },
+    get floating() {
+      return untrack(() => elements.floating);
+    },
+    get domReference() {
+      return untrack(() => elements.domReference);
+    },
+  };
+
   const context: PopupPositioningContext = {
     ...position,
     open,
     defaultPopupId,
     refs,
-    elements,
+    elements: contextElements,
+    // Read on demand, like React reads the context: consumers call it from handlers and effects,
+    // where a tracked read would warn. The effect below follows the node id.
     get nodeId() {
-      return options.nodeId;
+      return untrack(() => options.nodeId);
     },
     rootStore: store,
   };

@@ -4117,7 +4117,7 @@ describe('<Menu.Root />', () => {
                 <Show when={props.showSubmenu}>
                   <Menu.SubmenuRoot>
                     <Show when={props.onSubmenuStore}>
-                      {(onSubmenuStore) => <StoreCapture onStore={onSubmenuStore()} />}
+                      <StoreCapture onStore={props.onSubmenuStore!} />
                     </Show>
                     <Menu.SubmenuTrigger>More</Menu.SubmenuTrigger>
                   </Menu.SubmenuRoot>

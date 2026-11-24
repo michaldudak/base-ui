@@ -156,11 +156,12 @@ export function useMenuItemCommonProps(
     }
   }
 
-  return createMemo(() => ({
+  return createMemo<HTMLProps>(() => ({
     id: access(params.id),
     role: 'menuitem' as const,
     tabindex: tabIndex(),
-    'aria-selected': ariaSelected(),
+    // Solid's typings only accept the string form; `useRenderElement` renders `true` as "true".
+    'aria-selected': ariaSelected() ? ('true' as const) : undefined,
     // Real focus stays on the input or list that owns virtual navigation.
     onMouseDown: virtualFocus() ? preventMouseDownDefault : undefined,
     onKeyDown,

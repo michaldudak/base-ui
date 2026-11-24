@@ -14,15 +14,20 @@ export interface FloatingUIOpenChangeDetails {
   triggerElement?: Element | undefined;
 }
 
-type WithPreventBaseUIHandler<Handler> =
-  Handler extends JSX.EventHandlerUnion<infer Target, infer E, any>
-    ? | ((event: BaseUIEvent<E> & { currentTarget: Target; target: Element }) => void)
-      | [
-          (data: any, event: BaseUIEvent<E> & { currentTarget: Target; target: Element }) => void,
-          any,
-        ]
-      | undefined
-    : Handler;
+type BaseUIEventExtras = Pick<BaseUIEvent<Event>, 'preventBaseUIHandler' | 'baseUIHandlerPrevented'>;
+
+/**
+ * The event a Solid event handler type receives (with its `currentTarget` and `target` typing).
+ */
+type HandlerEvent<Handler> =
+  Extract<Handler, (...args: any[]) => any> extends (event: infer E) => any ? E : never;
+
+type WithPreventBaseUIHandler<Handler> = [HandlerEvent<Handler>] extends [never]
+  ? Handler
+  :
+      | ((event: HandlerEvent<Handler> & BaseUIEventExtras) => void)
+      | [(data: any, event: HandlerEvent<Handler> & BaseUIEventExtras) => void, any]
+      | undefined;
 
 /**
  * Adds a `preventBaseUIHandler` method to the events of all event handlers.

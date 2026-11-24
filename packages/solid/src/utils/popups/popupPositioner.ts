@@ -2,6 +2,7 @@ import { omit, onCleanup } from 'solid-js';
 import type { Accessor } from 'solid-js';
 import type { JSX } from '@solidjs/web';
 import type { SolidStore } from '#utils/store';
+import { useOnMount } from '#utils/useEffect';
 import { useAnchorPositioning } from '../../internals/useAnchorPositioning';
 import { POPUP_COLLISION_AVOIDANCE } from '../../internals/constants';
 import type {
@@ -203,6 +204,20 @@ export function usePopupPositioner<State extends PopupPositionerState>(
   };
   onCleanup(() => setPositionerElement(null));
 
+  // Solid port: a ref runs when the element is created, before its children are inserted. React
+  // attaches the ref once the whole subtree is in the document, and the focus manager and the
+  // interactions look up the popup inside the positioner as soon as it is published, so the
+  // element is published once the positioner's subtree is in the document.
+  let positionerNode: HTMLDivElement | null = null;
+  const recordPositionerElement = (node: HTMLDivElement) => {
+    positionerNode = node;
+  };
+  useOnMount(() => {
+    if (positionerNode !== null) {
+      setPositionerElement(positionerNode);
+    }
+  });
+
   // The element is created when it is first read, so that a part reading it inside its own
   // context providers gives the positioner's children access to them (see guide 3.5).
   let element: JSX.Element | undefined;
@@ -212,7 +227,7 @@ export function usePopupPositioner<State extends PopupPositionerState>(
       styles: positioning.positionerStyles,
       transitionStatus,
       props: elementProps,
-      refs: [options.forwardedRef, setPositionerElement],
+      refs: [options.forwardedRef, recordPositionerElement],
       hidden: () => !mounted(),
       inert: () => {
         const inert = options.inert;

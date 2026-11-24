@@ -1,4 +1,4 @@
-import { omit } from 'solid-js';
+import { omit, onCleanup } from 'solid-js';
 import type { JSX } from '@solidjs/web';
 import { useMenuPositionerContext } from '../positioner/MenuPositionerContext';
 import { useMenuRootContext } from '../root/MenuRootContext';
@@ -19,6 +19,8 @@ export function MenuArrow(componentProps: MenuArrow.Props): JSX.Element {
   const { store } = useMenuRootContext();
   const { arrowRef, side, align, arrowUncentered, arrowStyles } = useMenuPositionerContext();
   const open = store.useState('open');
+
+  onCleanup(() => arrowRef(null));
 
   const state: MenuArrowState = {
     get open() {

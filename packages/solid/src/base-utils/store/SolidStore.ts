@@ -40,7 +40,10 @@ export class SolidStore<
 
   declare readonly context: Context;
 
-  declare private selectors: Selectors | undefined;
+  // Solid port: loosely typed so a store with more selectors (and a wider state) is assignable to
+  // a store type with fewer (`MenuStore` to the popup positioner's store type). React consumes
+  // this class from built declarations, where private members carry no type.
+  declare private selectors: Record<PropertyKey, SelectorFunction<any>> | undefined;
 
   declare private version: Accessor<number>;
 

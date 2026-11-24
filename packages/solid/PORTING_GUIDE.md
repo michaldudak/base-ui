@@ -364,7 +364,7 @@ Mechanical changes:
 | `const { setProps } = await render(<X a={1} />)`, `setProps({ a: 2 })` | `await render((props) => <X a={1} {...props} />)`, `await setProps({ a: 2 })` |
 | `rerender(<X a={2} />)`                            | same as `setProps`                                                |
 | `className="x"`                                    | `class="x"`                                                       |
-| `render={<a href="/" />}`                          | `render={(props) => <a href="/" {...props} />}` (own props first, so Base UI's win, as in React) |
+| `render={<a href="/" />}`                          | `render={(props) => <a {...props} href="/" />}` (own props after the spread: the element's props win, as in React) |
 | `render={<Custom />}`                              | `render={Custom}`                                                 |
 | `function Test() { const [v, setV] = React.useState(0); ... {v} }` | `const [v, setV] = createSignal(0); ... {v()}`     |
 | `React.useRef<T>(null)` + `ref={ref}`              | `let el!: T;` + `ref={(node) => { el = node; }}`                  |

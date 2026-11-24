@@ -180,6 +180,15 @@ fireEvent.focus = (node: any, init?: any) => {
   return focus(node, init);
 };
 
+// React's `onChange` on a text input fires for the native `input` event, and React Testing
+// Library's `fireEvent.change` triggers it. The Solid components listen to `input`, so the pair is
+// dispatched here: ported tests keep calling `fireEvent.change`.
+const { change } = dtlFireEvent;
+fireEvent.change = (node: any, init?: any) => {
+  dtlFireEvent.input(node, init);
+  return change(node, init);
+};
+
 function assertTargetsActiveElement(element: any, eventName: string) {
   const doc = element.ownerDocument || element;
   const target = doc.activeElement || doc.body || doc.documentElement;

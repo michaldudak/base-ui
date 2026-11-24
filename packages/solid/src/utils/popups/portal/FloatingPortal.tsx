@@ -331,13 +331,19 @@ export function FloatingPortal(componentProps: FloatingPortal.Props<any>): JSX.E
   };
 
   // Clears a guard's ref when the guard is removed, like React does for unmounted refs.
-  const setGuardRef = (ref: { current: HTMLSpanElement | null }) => (element: HTMLSpanElement) => {
-    ref.current = element;
+  // The cleanup is registered when the ref is created (in the guard's owner): Solid forbids
+  // `onCleanup` inside a ref callback.
+  const setGuardRef = (ref: { current: HTMLSpanElement | null }) => {
+    let guardElement: HTMLSpanElement | null = null;
     onCleanup(() => {
-      if (ref.current === element) {
+      if (guardElement !== null && ref.current === guardElement) {
         ref.current = null;
       }
     });
+    return (element: HTMLSpanElement) => {
+      guardElement = element;
+      ref.current = element;
+    };
   };
 
   return (

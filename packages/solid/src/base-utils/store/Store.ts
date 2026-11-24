@@ -25,7 +25,10 @@ export class Store<State> {
    */
   declare state: State;
 
-  declare private listeners: Set<Listener<State>>;
+  // Solid port: typed with `any` so a store whose state extends another store's state is
+  // assignable to it (`MenuStore` to the popup root's store type). React consumes this class from
+  // built declarations, where private members carry no type.
+  declare private listeners: Set<Listener<any>>;
 
   // Internal state to handle recursive `setState()` calls
   declare private updateTick: number;

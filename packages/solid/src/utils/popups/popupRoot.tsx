@@ -278,7 +278,10 @@ export function renderPopupRootChildren<Store, Payload>(parameters: {
       {(() => {
         const children = parameters.children;
         // Called like a component: reads made in its body don't re-run this expression.
-        return typeof children === 'function'
+        // A lone component child resolves to what it returns, which can be an accessor (a `<Show>`
+        // returns a memo). Like Solid's own control flow, only a function that declares a
+        // parameter is a render function; an accessor is left for Solid to insert reactively.
+        return typeof children === 'function' && children.length > 0
           ? untrack(() => (children as PayloadChildRenderFunction<Payload>)(renderArg))
           : children;
       })()}

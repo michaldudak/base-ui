@@ -36,7 +36,15 @@ beforeEach(({ task, onTestFinished }) => {
   });
 });
 
-failOnConsole();
+failOnConsole({
+  silenceMessage: (message) => {
+    // React logs an error to the console when a component throws while rendering, so tests of
+    // such errors mock `console.error`. Solid reports the same situation with a
+    // `[REACTIVITY_HALTED]` warning. It is tolerated only while a test mocks `console.error`,
+    // that is, only where the React test tolerated React's report.
+    return message.includes('[REACTIVITY_HALTED]') && vi.isMockFunction(console.error);
+  },
+});
 
 afterEach(() => {
   vi.resetAllMocks();

@@ -1,6 +1,8 @@
 import { createContext, useContext } from 'solid-js';
 
-export type MenuGroupContext = (labelId: string | undefined) => void;
+export type MenuGroupContext = (
+  labelId: string | undefined | ((currentId: string | undefined) => string | undefined),
+) => void;
 
 export const MenuGroupContext = createContext<MenuGroupContext | null>(null);
 
