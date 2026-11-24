@@ -33,7 +33,10 @@ export function useControlled<T = unknown>(
 ): [Accessor<T>, (value: T | ((prev: T) => T)) => void];
 export function useControlled<T = unknown>(
   props: UseControlledProps<T>,
-): [Accessor<T | undefined>, (value: T | undefined | ((prev: T | undefined) => T | undefined)) => void];
+): [
+  Accessor<T | undefined>,
+  (value: T | undefined | ((prev: T | undefined) => T | undefined)) => void,
+];
 export function useControlled<T = unknown>(
   props: UseControlledProps<T>,
 ): [Accessor<T | undefined>, (value: any) => void] {

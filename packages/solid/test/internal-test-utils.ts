@@ -121,11 +121,33 @@ export async function flushMicrotasks() {
 
 // Every event Testing Library dispatches (through `fireEvent` or `user-event`) applies pending
 // Solid updates before returning, the way React Testing Library wraps events in `act()`.
+/**
+ * Applies the updates an event caused. `user-event` also dispatches events when the library itself
+ * moves focus, which can happen inside an effect. There the flush is a no-op that Solid reports
+ * with a `FLUSH_IN_EFFECT_CALLBACK` warning; only that warning is dropped.
+ */
+function flushAfterEvent() {
+  /* eslint-disable no-console */
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('[FLUSH_IN_EFFECT_CALLBACK]')) {
+      return;
+    }
+    originalWarn(...args);
+  };
+  try {
+    flush();
+  } finally {
+    console.warn = originalWarn;
+  }
+  /* eslint-enable no-console */
+}
+
 // After each `user-event` call the queue of 0 ms timers is drained, also like React Testing Library.
 configure({
   eventWrapper: (cb) => {
     const result = cb();
-    flush();
+    flushAfterEvent();
     return result;
   },
   asyncWrapper: async (cb) => {

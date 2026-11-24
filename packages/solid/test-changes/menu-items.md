@@ -8,3 +8,7 @@
 - `link-item/MenuLinkItem.test.tsx`, "does not navigate when Space is pressed during an active typeahead session": skipped for the same reason, body kept as a block comment.
 - `group-label/MenuGroupLabel.test.tsx`, "does not let an older label cleanup clear a newer label": the `Test` component's `{labels !== 'new' && <X key="old" />}` became `<Show when={props.labels !== 'new'}>`, and `rerender(<Test labels="both" />)` became `setProps({ labels: 'both' })`. The `key` props are gone, since `<Show>` keeps each label at its own position.
 - `list/MenuList.test.tsx`, "does not point an inactive trigger at the list" and "does not re-render an inactive trigger when the list mounts": `useRefWithInit(() => Menu.createHandle()).current` became `Menu.createHandle()`, since the component body runs once.
+
+## Later fixes
+
+- `group-label/MenuGroupLabel.test.tsx`, "should support GroupLabel when RadioGroup is rendered as Group": `render={Menu.RadioGroup}` became `render={(props) => <Menu.RadioGroup {...(props as Menu.RadioGroup.Props)} />}`. The props a render function receives (`HTMLProps`) and a part's own props differ in their event handler types (Base UI events vs. native ones), so passing a part directly as `render` does not type-check yet. A typing gap of the port, not a behaviour change.

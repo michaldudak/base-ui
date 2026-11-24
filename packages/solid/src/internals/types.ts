@@ -14,7 +14,10 @@ export interface FloatingUIOpenChangeDetails {
   triggerElement?: Element | undefined;
 }
 
-type BaseUIEventExtras = Pick<BaseUIEvent<Event>, 'preventBaseUIHandler' | 'baseUIHandlerPrevented'>;
+type BaseUIEventExtras = Pick<
+  BaseUIEvent<Event>,
+  'preventBaseUIHandler' | 'baseUIHandlerPrevented'
+>;
 
 /**
  * The event a Solid event handler type receives (with its `currentTarget` and `target` typing).
@@ -24,10 +27,9 @@ type HandlerEvent<Handler> =
 
 type WithPreventBaseUIHandler<Handler> = [HandlerEvent<Handler>] extends [never]
   ? Handler
-  :
-      | ((event: HandlerEvent<Handler> & BaseUIEventExtras) => void)
-      | [(data: any, event: HandlerEvent<Handler> & BaseUIEventExtras) => void, any]
-      | undefined;
+  : | ((event: HandlerEvent<Handler> & BaseUIEventExtras) => void)
+    | [(data: any, event: HandlerEvent<Handler> & BaseUIEventExtras) => void, any]
+    | undefined;
 
 /**
  * Adds a `preventBaseUIHandler` method to the events of all event handlers.

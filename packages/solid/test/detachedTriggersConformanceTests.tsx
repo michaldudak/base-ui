@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from 'solid-js';
+import { createSignal, For, Show, untrack } from 'solid-js';
 import type { Component } from 'solid-js';
 import type { JSX } from '@solidjs/web';
 import { useIsoLayoutEffect } from '#utils/useEffect';
@@ -51,7 +51,7 @@ export function detachedTriggersConformanceTests(config: DetachedTriggersTestCon
     // `mode`, `rootFirst`, `rootProps`, `positionerProps`, `withViewport` and `triggerProps` are
     // fixed for a test. `handle`, `triggerCount`, `rootMounted` and `nesting` change with
     // `setProps`, so they are read where they are used.
-    const detached = props.mode === 'detached';
+    const detached = untrack(() => props.mode === 'detached');
     const triggerCount = () => props.triggerCount ?? 2;
 
     const renderTriggers = () => {
@@ -125,7 +125,7 @@ export function detachedTriggersConformanceTests(config: DetachedTriggersTestCon
       return renderRoot();
     }
 
-    return props.rootFirst ? (
+    return untrack(() => props.rootFirst) ? (
       <>
         {renderRoot()}
         {renderTriggers()}

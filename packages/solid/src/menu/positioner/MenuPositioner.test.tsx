@@ -755,9 +755,7 @@ describe('<Menu.Positioner />', () => {
         <Trigger {...props.trigger}>Trigger</Trigger>
         <Menu.Portal>
           <Menu.Positioner {...props.positioner}>
-            <Menu.Popup {...props.popup}>
-              Popup
-            </Menu.Popup>
+            <Menu.Popup {...props.popup}>Popup</Menu.Popup>
           </Menu.Positioner>
         </Menu.Portal>
       </Menu.Root>

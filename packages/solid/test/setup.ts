@@ -20,6 +20,14 @@ async function cleanupTest(task: object) {
     }
   } finally {
     vi.useRealTimers();
+    // KNOWN ISSUE (see PORTING.md, "Open issues"): in a real browser, disposing a root while a
+    // filter input that was typed into still has focus makes Solid's owner disposal loop forever.
+    // Blurring first avoids it, so the browser run can finish. jsdom is not affected.
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && focused !== document.body) {
+      focused.blur();
+    }
+    flush();
     cleanup();
     flush();
   }

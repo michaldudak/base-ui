@@ -108,5 +108,5 @@ later. Callers read `props.x` lazily (spread `{...props.root}` and so on) and ne
 ## Matchers
 
 - `toBeVisible` (`test/addVitestMatchers.ts`): reimplemented with the semantics the React package actually runs with. There, `@mui/internal-test-utils` installs the `chai-dom` versions (computed `visibility` only), which win over the `@testing-library/jest-dom` ones. Without this, ported tests that render an open menu without a trigger failed, because such a popup keeps `opacity: 0` in both libraries.
-  A negated  keeps the strict jest-dom check.
+  A negated keeps the strict jest-dom check.
   A negated `not.toBeVisible()` keeps the strict jest-dom check.

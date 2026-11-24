@@ -37,12 +37,7 @@ export default function MenuDetachedTriggersControlledDemo() {
   return (
     <>
       <div class={styles.Container}>
-        <Menu.Trigger
-          class={styles.Button}
-          handle={demoMenu}
-          id="menu-trigger-1"
-          payload="library"
-        >
+        <Menu.Trigger class={styles.Button} handle={demoMenu} id="menu-trigger-1" payload="library">
           Library
         </Menu.Trigger>
 
@@ -55,12 +50,7 @@ export default function MenuDetachedTriggersControlledDemo() {
           Playback
         </Menu.Trigger>
 
-        <Menu.Trigger
-          class={styles.Button}
-          handle={demoMenu}
-          id="menu-trigger-3"
-          payload="share"
-        >
+        <Menu.Trigger class={styles.Button} handle={demoMenu} id="menu-trigger-3" payload="share">
           Share
         </Menu.Trigger>
 

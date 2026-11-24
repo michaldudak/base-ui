@@ -45,44 +45,44 @@ Consequences that drive every rule below:
 
 ## 2. Mapping table
 
-| React                                             | Solid                                                                 |
-| ------------------------------------------------- | --------------------------------------------------------------------- |
-| `React.forwardRef((props, ref) => ...)`           | `function X(componentProps: X.Props): JSX.Element`; `ref` is a prop    |
-| `const { a, b = 1, ...elementProps } = props`     | `const elementProps = omit(props, 'a', 'b')`; read `props.a`, `props.b ?? 1` lazily |
-| `React.useState(v)` (drives rendering)            | `createSignal(v, { ownedWrite: true })`                               |
-| `React.useState(v)` read back in handlers         | a field in the store, or a plain `let` plus a signal for rendering    |
-| `React.useRef(v)`                                 | `const ref = { current: v }` (keep the `.current` shape)              |
-| `useRefWithInit(fn)`                              | `const ref = { current: fn() }`                                       |
-| `React.useMemo(fn, deps)`                         | `createMemo(fn)` (dependencies are tracked automatically)             |
-| `useStableCallback(fn)` / `React.useCallback`     | `fn` (a plain function)                                               |
-| `useValueAsRef(v)`                                | read the accessor where needed                                        |
-| `React.useEffect(fn, deps)`                       | `useEffect(() => [deps], ([deps]) => { ... })` from `#utils/useEffect` |
-| `useIsoLayoutEffect(fn, deps)`                    | `useIsoLayoutEffect` from `#utils/useEffect` (same function)          |
-| `useOnMount(fn)`                                  | `useOnMount(fn)` from `#utils/useEffect`                              |
-| effect cleanup / unmount                          | return a function from the effect; `onCleanup(fn)` in a component body |
-| `useControlled({ controlled, default })`          | `useControlled({ controlled: () => props.x, default: () => props.defaultX })` from `#utils/useControlled`, returns `[accessor, setter]` |
-| `useId()` / `useBaseUiId(id)`                     | `useId()` from `#utils/useId` / `useBaseUiId(() => props.id)`, returns an accessor |
-| `useTimeout()` / `useAnimationFrame()`            | same names in `#utils/useTimeout`, `#utils/useAnimationFrame`         |
-| `ReactDOM.flushSync(fn)`                          | `fn(); flush();` (`flush` from `solid-js`)                            |
-| `React.createContext(undefined)` + `useContext`   | `createContext<T \| null>(null)` + `useContext` from `solid-js` (see 3.5) |
-| `<Ctx.Provider value={v}>`                        | `<Ctx value={v}>`                                                     |
-| `ReactDOM.createPortal(children, node)`           | `<Portal mount={node}>{children}</Portal>` from `@solidjs/web`        |
-| `if (!mounted) return null`                       | `<Show when={mounted()}>...</Show>`, or `enabled` of `useRenderElement` |
-| `items.map((item) => <X key={item.id} />)`        | `<For each={items()}>{(item) => <X />}</For>`                         |
-| `React.Children`, `cloneElement`, `isValidElement`| no equivalent; restructure with context or the `render` function      |
-| `ReactStore`                                      | `SolidStore` from `#utils/store`                                      |
-| `store.useState('key')` (a value)                 | `store.useState('key')` (an **accessor**)                             |
-| `useRenderElement(tag, props, params)`            | same name, section 5                                                  |
-| `mergeProps(a, b)`                                | same name in `../merge-props`, section 5                              |
-| `className`, `htmlFor`, `tabIndex`, `readOnly`    | `class`, `for`, `tabindex`, `readonly` (all attributes lowercase)     |
-| `event.nativeEvent`                               | `event` (events are native)                                           |
-| `event.isPropagationStopped()`                    | `event.cancelBubble`                                                  |
-| `React.KeyboardEvent`, `React.MouseEvent`, ...    | `KeyboardEvent`, `MouseEvent`, ...                                    |
-| `React.CSSProperties`                             | `JSX.CSSProperties` (kebab-case keys: `'pointer-events'`)             |
-| `React.ReactNode`                                 | `JSX.Element` (`import type { JSX } from '@solidjs/web'`)             |
-| `React.RefObject<T>`                              | `{ current: T }`                                                      |
-| `React.Ref<T>` (a prop)                           | `(element: T) => void`                                                |
-| `'use client'`                                    | delete                                                                |
+| React                                              | Solid                                                                                                                                   |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `React.forwardRef((props, ref) => ...)`            | `function X(componentProps: X.Props): JSX.Element`; `ref` is a prop                                                                     |
+| `const { a, b = 1, ...elementProps } = props`      | `const elementProps = omit(props, 'a', 'b')`; read `props.a`, `props.b ?? 1` lazily                                                     |
+| `React.useState(v)` (drives rendering)             | `createSignal(v, { ownedWrite: true })`                                                                                                 |
+| `React.useState(v)` read back in handlers          | a field in the store, or a plain `let` plus a signal for rendering                                                                      |
+| `React.useRef(v)`                                  | `const ref = { current: v }` (keep the `.current` shape)                                                                                |
+| `useRefWithInit(fn)`                               | `const ref = { current: fn() }`                                                                                                         |
+| `React.useMemo(fn, deps)`                          | `createMemo(fn)` (dependencies are tracked automatically)                                                                               |
+| `useStableCallback(fn)` / `React.useCallback`      | `fn` (a plain function)                                                                                                                 |
+| `useValueAsRef(v)`                                 | read the accessor where needed                                                                                                          |
+| `React.useEffect(fn, deps)`                        | `useEffect(() => [deps], ([deps]) => { ... })` from `#utils/useEffect`                                                                  |
+| `useIsoLayoutEffect(fn, deps)`                     | `useIsoLayoutEffect` from `#utils/useEffect` (same function)                                                                            |
+| `useOnMount(fn)`                                   | `useOnMount(fn)` from `#utils/useEffect`                                                                                                |
+| effect cleanup / unmount                           | return a function from the effect; `onCleanup(fn)` in a component body                                                                  |
+| `useControlled({ controlled, default })`           | `useControlled({ controlled: () => props.x, default: () => props.defaultX })` from `#utils/useControlled`, returns `[accessor, setter]` |
+| `useId()` / `useBaseUiId(id)`                      | `useId()` from `#utils/useId` / `useBaseUiId(() => props.id)`, returns an accessor                                                      |
+| `useTimeout()` / `useAnimationFrame()`             | same names in `#utils/useTimeout`, `#utils/useAnimationFrame`                                                                           |
+| `ReactDOM.flushSync(fn)`                           | `fn(); flush();` (`flush` from `solid-js`)                                                                                              |
+| `React.createContext(undefined)` + `useContext`    | `createContext<T \| null>(null)` + `useContext` from `solid-js` (see 3.5)                                                               |
+| `<Ctx.Provider value={v}>`                         | `<Ctx value={v}>`                                                                                                                       |
+| `ReactDOM.createPortal(children, node)`            | `<Portal mount={node}>{children}</Portal>` from `@solidjs/web`                                                                          |
+| `if (!mounted) return null`                        | `<Show when={mounted()}>...</Show>`, or `enabled` of `useRenderElement`                                                                 |
+| `items.map((item) => <X key={item.id} />)`         | `<For each={items()}>{(item) => <X />}</For>`                                                                                           |
+| `React.Children`, `cloneElement`, `isValidElement` | no equivalent; restructure with context or the `render` function                                                                        |
+| `ReactStore`                                       | `SolidStore` from `#utils/store`                                                                                                        |
+| `store.useState('key')` (a value)                  | `store.useState('key')` (an **accessor**)                                                                                               |
+| `useRenderElement(tag, props, params)`             | same name, section 5                                                                                                                    |
+| `mergeProps(a, b)`                                 | same name in `../merge-props`, section 5                                                                                                |
+| `className`, `htmlFor`, `tabIndex`, `readOnly`     | `class`, `for`, `tabindex`, `readonly` (all attributes lowercase)                                                                       |
+| `event.nativeEvent`                                | `event` (events are native)                                                                                                             |
+| `event.isPropagationStopped()`                     | `event.cancelBubble`                                                                                                                    |
+| `React.KeyboardEvent`, `React.MouseEvent`, ...     | `KeyboardEvent`, `MouseEvent`, ...                                                                                                      |
+| `React.CSSProperties`                              | `JSX.CSSProperties` (kebab-case keys: `'pointer-events'`)                                                                               |
+| `React.ReactNode`                                  | `JSX.Element` (`import type { JSX } from '@solidjs/web'`)                                                                               |
+| `React.RefObject<T>`                               | `{ current: T }`                                                                                                                        |
+| `React.Ref<T>` (a prop)                            | `(element: T) => void`                                                                                                                  |
+| `'use client'`                                     | delete                                                                                                                                  |
 
 Imports: reactive primitives come from `solid-js` (`createSignal`, `createMemo`, `createContext`,
 `useContext`, `onCleanup`, `untrack`, `flush`, `omit`, `merge`, `Show`, `For`); DOM things come
@@ -110,6 +110,7 @@ React hooks stay functions named `useX`. They are called once, from the componen
   ```
 
   The params object itself is not destructured (callers may pass an object with getters).
+
 - A parameter that is a **callback** (`onOpenChange`, `getItems`) stays a plain function and is
   never passed through `access()`.
 - A parameter that is a ref object stays `{ current: T }`.
@@ -181,7 +182,7 @@ Rules:
 ```tsx
 // React
 const popupRef = React.useRef<HTMLDivElement | null>(null);
-<div ref={useMergedRefs(forwardedRef, popupRef, store.useStateSetter('popupElement'))} />
+<div ref={useMergedRefs(forwardedRef, popupRef, store.useStateSetter('popupElement'))} />;
 
 // Solid
 const popupRef = { current: null as HTMLDivElement | null };
@@ -307,9 +308,9 @@ in prop bags.
   native ones are not. Keep `onMouseEnter`/`onMouseLeave` unless the code depends on that.
 - These events are _delegated_ by Solid (one listener on the document, React-style, and they
   **bubble through `<Portal>` to the logical parent** like in React): `beforeinput, click,
-  dblclick, contextmenu, focusin, focusout, input, keydown, keyup, mousedown, mousemove, mouseout,
-  mouseover, mouseup, pointerdown, pointermove, pointerout, pointerover, pointerup, touchend,
-  touchmove, touchstart`. All others (`focus`, `blur`, `mouseenter`, `mouseleave`, `pointerenter`,
+dblclick, contextmenu, focusin, focusout, input, keydown, keyup, mousedown, mousemove, mouseout,
+mouseover, mouseup, pointerdown, pointermove, pointerout, pointerover, pointerup, touchend,
+touchmove, touchstart`. All others (`focus`, `blur`, `mouseenter`, `mouseleave`, `pointerenter`,
   `pointerleave`, `scroll`, `wheel`, `change`, ...) are attached to the element directly and do
   not cross portals.
 - `event.stopPropagation()` in a delegated handler stops other delegated handlers up the tree,
@@ -343,6 +344,25 @@ in prop bags.
 - A value returned from a hook as an accessor must be _called_. Passing `open` instead of
   `open()` to an attribute is the most common mistake; the type checker catches most of them, so
   keep types precise and run it.
+- **`onCleanup` inside a `ref` callback throws** (`CLEANUP_IN_FORBIDDEN_SCOPE`) and halts the
+  reactive system. Register the cleanup in the component body or in an effect.
+- **Never read `props.children` (or call a `render` function) to inspect it.** Reading creates the
+  elements and components. There is no way to look at children without rendering them.
+- **Do not render conditional siblings around a focusable element.** When siblings appear or
+  disappear, Solid may move the existing element with `insertBefore`, which blurs it in browsers
+  without `Element.moveBefore`. Insert the extra nodes by hand (see the focus guards in
+  `MenuTrigger`).
+- **A function child is a render function only if it declares a parameter** (`children.length > 0`,
+  the rule `<Show>` uses). A lone component child can arrive as a zero-argument accessor, which
+  must be left for Solid to insert.
+- **Parents' effects run before their children's**, the reverse of React, and there is no separate
+  layout phase. Code that reads something "before an unmount effect clears it", or expects children
+  to have registered, needs to be restructured rather than translated.
+- React's `onFocus`/`onBlur` bubble; Solid's are the native, non-bubbling events. Use `onFocusIn`/
+  `onFocusOut` where the React handler relied on bubbling.
+- Library code imports `mergeProps` from `merge-props/mergeProps` (it leaves `children` out). The
+  public one in `merge-props/index.ts` forwards `children` as a getter for consumers' render
+  functions.
 
 ## 8. Tests
 
@@ -356,23 +376,23 @@ implementation), `#test-utils`, `vitest`; `@base-ui/react/menu` becomes `@base-u
 
 Mechanical changes:
 
-| React test                                         | Solid test                                                        |
-| -------------------------------------------------- | ----------------------------------------------------------------- |
-| `await render(<Menu.Root>...</Menu.Root>)`         | `await render(() => <Menu.Root>...</Menu.Root>)`                  |
-| `describeConformance(<Menu.Item />, () => ({...}))` | `describeConformance((props) => <Menu.Item {...props} />, () => ({...}))` |
-| conformance `render: (node) => render(<W>{node}</W>)` | `render: (node) => render(() => <W>{node()}</W>)`              |
-| `const { setProps } = await render(<X a={1} />)`, `setProps({ a: 2 })` | `await render((props) => <X a={1} {...props} />)`, `await setProps({ a: 2 })` |
-| `rerender(<X a={2} />)`                            | same as `setProps`                                                |
-| `className="x"`                                    | `class="x"`                                                       |
-| `render={<a href="/" />}`                          | `render={(props) => <a {...props} href="/" />}` (own props after the spread: the element's props win, as in React) |
-| `render={<Custom />}`                              | `render={Custom}`                                                 |
-| `function Test() { const [v, setV] = React.useState(0); ... {v} }` | `const [v, setV] = createSignal(0); ... {v()}`     |
-| `React.useRef<T>(null)` + `ref={ref}`              | `let el!: T;` + `ref={(node) => { el = node; }}`                  |
-| `React.createRef()`                                | same as above                                                     |
-| `tabIndex`, `onChange` (inputs)                    | `tabindex`, `onInput`                                             |
-| `style={{ marginTop: 10 }}`                        | `style={{ 'margin-top': '10px' }}`                                |
-| `{cond && <X />}` depending on state               | `<Show when={cond()}><X /></Show>`                                |
-| `{items.map((i) => <X key={i} />)}`                | `<For each={items}>{(i) => <X />}</For>` (or keep `.map` for static arrays) |
+| React test                                                             | Solid test                                                                                                         |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `await render(<Menu.Root>...</Menu.Root>)`                             | `await render(() => <Menu.Root>...</Menu.Root>)`                                                                   |
+| `describeConformance(<Menu.Item />, () => ({...}))`                    | `describeConformance((props) => <Menu.Item {...props} />, () => ({...}))`                                          |
+| conformance `render: (node) => render(<W>{node}</W>)`                  | `render: (node) => render(() => <W>{node()}</W>)`                                                                  |
+| `const { setProps } = await render(<X a={1} />)`, `setProps({ a: 2 })` | `await render((props) => <X a={1} {...props} />)`, `await setProps({ a: 2 })`                                      |
+| `rerender(<X a={2} />)`                                                | same as `setProps`                                                                                                 |
+| `className="x"`                                                        | `class="x"`                                                                                                        |
+| `render={<a href="/" />}`                                              | `render={(props) => <a {...props} href="/" />}` (own props after the spread: the element's props win, as in React) |
+| `render={<Custom />}`                                                  | `render={Custom}`                                                                                                  |
+| `function Test() { const [v, setV] = React.useState(0); ... {v} }`     | `const [v, setV] = createSignal(0); ... {v()}`                                                                     |
+| `React.useRef<T>(null)` + `ref={ref}`                                  | `let el!: T;` + `ref={(node) => { el = node; }}`                                                                   |
+| `React.createRef()`                                                    | same as above                                                                                                      |
+| `tabIndex`, `onChange` (inputs)                                        | `tabindex`, `onInput`                                                                                              |
+| `style={{ marginTop: 10 }}`                                            | `style={{ 'margin-top': '10px' }}`                                                                                 |
+| `{cond && <X />}` depending on state                                   | `<Show when={cond()}><X /></Show>`                                                                                 |
+| `{items.map((i) => <X key={i} />)}`                                    | `<For each={items}>{(i) => <X />}</For>` (or keep `.map` for static arrays)                                        |
 
 - `fireEvent`, `act`, `flushMicrotasks`, `waitFor`, `screen`, `user` (from `await render`),
   `clock`, `isJSDOM`, `wait`, `waitSingleFrame` behave as in the React setup: pending Solid

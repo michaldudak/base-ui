@@ -1,3 +1,4 @@
+import type { ParentComponent } from 'solid-js';
 import { expect, vi, describe, beforeEach, it, onTestFinished } from 'vitest';
 import { createSignal, For, Show } from 'solid-js';
 import { dynamic } from '@solidjs/web';
@@ -6220,6 +6221,8 @@ describe('<Menu.FilterProvider><Menu.Root/></Menu.FilterProvider>', () => {
   describe('with a Viewport', () => {
     // Solid port, skipped: `Menu.Viewport` is outside the scope of the proof of concept.
     it.skip('keeps real focus on the input while the cursor moves through the list', async () => {
+      // `Menu.Viewport` does not exist in the Solid port yet.
+      const Viewport = (Menu as unknown as { Viewport: ParentComponent }).Viewport;
       const { user } = await render(() => (
         <Menu.FilterProvider>
           <Menu.Root defaultOpen>
@@ -6228,12 +6231,12 @@ describe('<Menu.FilterProvider><Menu.Root/></Menu.FilterProvider>', () => {
               <Menu.Positioner>
                 <Menu.Popup>
                   <Menu.Input aria-label="Filter actions" />
-                  <Menu.Viewport>
+                  <Viewport>
                     <Menu.List>
                       <Menu.Item>Rename</Menu.Item>
                       <Menu.Item>Delete</Menu.Item>
                     </Menu.List>
-                  </Menu.Viewport>
+                  </Viewport>
                 </Menu.Popup>
               </Menu.Positioner>
             </Menu.Portal>

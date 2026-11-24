@@ -149,7 +149,10 @@ export class SolidStore<
   /**
    * Keeps a state key in sync with a controlled prop. `undefined` leaves the key uncontrolled.
    */
-  useControlledProp<Key extends keyof State>(key: Key, controlled: Accessor<State[Key] | undefined>) {
+  useControlledProp<Key extends keyof State>(
+    key: Key,
+    controlled: Accessor<State[Key] | undefined>,
+  ) {
     createRenderEffect(controlled, (next) => {
       if (next !== undefined && !Object.is(this.state[key], next)) {
         this.setState({ ...this.state, [key]: next });
@@ -178,8 +181,7 @@ export class SolidStore<
     key: Key,
     fn: Accessor<ContextFunction<Context, Key> | undefined>,
   ) {
-    (this.context as Record<Key, MaybeCallable>)[key] = (...args: any[]) =>
-      untrack(fn)?.(...args);
+    (this.context as Record<Key, MaybeCallable>)[key] = (...args: any[]) => untrack(fn)?.(...args);
   }
 
   /**

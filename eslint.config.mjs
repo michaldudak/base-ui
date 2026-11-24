@@ -57,7 +57,14 @@ const NO_RESTRICTED_IMPORTS_PATHS_TOP_LEVEL_PACKAGES = [
 ];
 
 export default defineConfig(
-  globalIgnores(['./examples', './playground/vite-app/dist']),
+  globalIgnores([
+    './examples',
+    './playground/vite-app/dist',
+    // The SolidJS proof of concept. The shared config applies React rules (hooks, JSX, props)
+    // that don't fit Solid code; it needs its own ESLint setup before it can be linted here.
+    './packages/solid',
+    './playground/solid',
+  ]),
   baseConfig,
   // eslint-plugin-mdx loads `.remarkrc.mjs` itself, but ESLint doesn't know
   // that file is a config dependency, so `--cache` doesn't invalidate when

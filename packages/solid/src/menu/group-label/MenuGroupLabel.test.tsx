@@ -166,7 +166,9 @@ describe('<Menu.GroupLabel />', () => {
           <Menu.Portal>
             <Menu.Positioner>
               <Menu.Popup>
-                <Menu.Group render={Menu.RadioGroup}>
+                <Menu.Group
+                  render={(props) => <Menu.RadioGroup {...(props as Menu.RadioGroup.Props)} />}
+                >
                   <Menu.GroupLabel>Test group</Menu.GroupLabel>
                 </Menu.Group>
               </Menu.Popup>
